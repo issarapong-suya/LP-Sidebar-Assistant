@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sidebar Doctor Assistant — ผู้ช่วยแพทย์ในหน้าจอทำงาน</title>
+  <!-- Bundled font for offline hospital networks -->
+  <link rel="stylesheet" href="/fonts/prompt.css">
+  <link rel="stylesheet" href="assistant.css">
+</head>
+<body>
+
+  <!-- ─── Sidebar Header: สรุปสถานะคนไข้และเลขคิว ─── -->
+  <header class="assistant-header">
+    <div class="header-top">
+      <div class="app-tag">
+        <span class="icon-pulse">🟢</span>
+        <span class="app-name">OPD Doctor Assistant</span>
+      </div>
+      <div class="header-controls">
+        <!-- ปุ่มปรับขนาด Font: A- / A / A+ -->
+        <div class="font-scaler-box" id="fontScalerBox" title="ปรับขนาดตัวอักษรของระบบ">
+          <button type="button" class="btn-font-scale" id="btnFontDown" title="ลดขนาดตัวอักษร">A-</button>
+          <span class="font-scale-text" id="fontScaleText">100%</span>
+          <button type="button" class="btn-font-scale" id="btnFontUp" title="เพิ่มขนาดตัวอักษร">A+</button>
+        </div>
+        <div class="sync-badge" id="syncStatusBadge" title="ระบบเชื่อมต่อ HOSxP แบบ Real-Time อัตโนมัติ">
+          <span class="sync-dot"></span>
+          <span id="syncStatusText">ซิงค์อัตโนมัติ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ข้อมูลคนไข้ปัจจุบัน (ดึงจาก HOSxP อัตโนมัติ หรือค้นหาได้) -->
+    <div class="patient-card">
+      <div class="patient-main-row">
+        <!-- เปลี่ยนเป็น HN Badge แทน queue-badge เดิม -->
+        <div class="hn-badge-box" id="patientHnBadge" title="เลขประจำตัวผู้ป่วย (HN)">HN -</div>
+        <div class="patient-names">
+          <div class="patient-name" id="patientName">รอคนไข้จาก HOSxP...</div>
+          <div class="patient-sub">
+            <div class="patient-sub-left">
+              <span id="patientAge">อายุ: -</span>
+              <span id="patientQueueWrap" style="display: none;"> · <span id="patientQueueText">Q: -</span></span>
+            </div>
+            <!-- dep-pill มาอยู่บรรทัดเดียวกับอายุ แต่อยู่ชิดขวา แสดงชื่อแผนกเต็มๆ -->
+            <div class="dep-pill" id="patientDepPill" title="แผนกที่รับบริการ">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="patient-vn-row">
+        <div class="vn-left">
+          <span class="vn-label">VN:</span>
+          <span class="vn-val" id="patientVn">-</span>
+          <button type="button" class="btn-select-visit" id="btnSelectVisit" title="เลือกดู Visit อื่นๆ ของคนไข้ท่านนี้">🗓️ เลือก Visit ▾</button>
+        </div>
+        <div class="vn-controls">
+          <button class="btn-sm" id="btnToggleSearch" title="ค้นหาผู้ป่วยด้วย HN, ชื่อ-สกุล หรือ VN">🔍 ค้นหา</button>
+          <button class="btn-refresh" id="btnRefresh" title="กดเพื่อรีเฟรชข้อมูลล่าสุด">🔄</button>
+        </div>
+      </div>
+      <!-- Dropdown รายการ Visit ย้อนหลังของผู้ป่วยปัจจุบัน -->
+      <div class="visit-dropdown-list" id="visitDropdownList" style="display: none;"></div>
+
+      <!-- แถบค้นหาผู้ป่วยอัจฉริยะ (ค้นหาด้วย HN หรือ ชื่อ-สกุล พร้อม Dropdown รายชื่อ) -->
+      <div class="patient-search-box" id="patientSearchBox" style="display: none;">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="inputPatientSearch" placeholder="พิมพ์ HN หรือ ชื่อ-สกุล ผู้ป่วย..." autocomplete="off" />
+          <button class="btn-search-clear" id="btnSearchClear" style="display: none;" title="ล้างข้อความ">✕</button>
+        </div>
+        <div class="search-dropdown-list" id="searchDropdownList" style="display: none;"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── Alert Toast Container: ป๊อปอัปแจ้งเตือนเวลาเปลี่ยนคนไข้ / ผลแล็บวิกฤต / เสนอยาสมุนไพร ─── -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ─── เนื้อหาผู้ช่วยแพทย์ (Scrollable Body) ─── -->
+  <main class="assistant-body">
+
+    <!-- 1. ไต & สัญญาณชีพ -->
+    <section class="card-section" id="secRenal">
+      <div class="section-title">
+        <span class="title-icon">🩺</span>
+        <span>ไต & สัญญาณชีพ</span>
+      </div>
+
+      <div class="metrics-grid">
+        <!-- eGFR -->
+        <div class="metric-box clickable-metric" id="boxEgfr" title="คลิกเพื่อดูประวัติ eGFR & Creatinine 10 ครั้ง">
+          <div class="metric-click-hint">📈 10 ครั้ง</div>
+          <div class="metric-label">eGFR</div>
+          <div class="metric-val" id="valEgfr">-</div>
+          <div class="metric-unit">ml/min/1.73m²</div>
+          <div class="metric-sub" id="valCkdStage">รอข้อมูล</div>
+        </div>
+
+        <!-- CrCl -->
+        <div class="metric-box clickable-metric" id="boxCrcl" title="คลิกเพื่อดูประวัติ CrCl และการปรับขนาดยา">
+          <div class="metric-click-hint">💊 ขนาดยา</div>
+          <div class="metric-label">CrCl</div>
+          <div class="metric-val" id="valCrcl">-</div>
+          <div class="metric-unit">ml/min</div>
+          <div class="metric-sub" id="valScr">Cr: - mg/dL</div>
+        </div>
+
+        <!-- BP -->
+        <div class="metric-box clickable-metric" id="boxBp" title="คลิกเพื่อดูประวัติความดันโลหิต & ชีพจร 10 ครั้ง">
+          <div class="metric-click-hint">📈 10 ครั้ง</div>
+          <div class="metric-label">ความดันโลหิต</div>
+          <div class="metric-val" id="valBp">-/-</div>
+          <div class="metric-unit">mmHg</div>
+          <div class="metric-sub" id="valBpStatus">ชีพจร: - bpm</div>
+        </div>
+
+        <!-- Sugar / HbA1c -->
+        <div class="metric-box clickable-metric" id="boxSugar" title="คลิกเพื่อดูประวัติระดับน้ำตาล & HbA1c 10 ครั้ง">
+          <div class="metric-click-hint">📈 10 ครั้ง</div>
+          <div class="metric-label">ระดับน้ำตาล</div>
+          <div class="metric-val" id="valFbs">-</div>
+          <div class="metric-unit">mg/dL</div>
+          <div class="metric-sub" id="valHba1c">HbA1c: -</div>
+        </div>
+      </div>
+
+      <!-- แถบน้ำหนัก ส่วนสูง และ BMI (แยกออกจากกล่องความดันอย่างชัดเจน) -->
+      <div class="vitals-strip" id="vitalsStrip" title="คลิกเพื่อดูประวัติน้ำหนัก ส่วนสูง และ BMI ย้อนหลัง 10 ครั้ง">
+        <div class="vitals-strip-item">⚖️ <b>นน./สส.:</b> <span id="valBw">-</span> kg / <span id="valHeight">-</span> cm</div>
+        <div class="vitals-strip-item">📊 <b>BMI:</b> <span id="valBmi">-</span></div>
+        <div class="vitals-strip-link">📈 ประวัติน้ำหนัก</div>
+      </div>
+    </section>
+
+    <!-- 2. แจ้งเตือนผลแล็บผิดปกติ -->
+    <section class="card-section" id="secLabs">
+      <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="title-icon">🧪</span>
+          <span>แจ้งเตือนผลแล็บ</span>
+          <span class="badge-count" id="labCountBadge">0</span>
+        </div>
+        <button type="button" class="btn-lab-header-trend" id="btnLabTrendHeader" title="คลิกเพื่อดูกราฟแนวโน้มผลแล็บย้อนหลัง">📈 ดูกราฟแนวโน้มแล็บ</button>
+      </div>
+      <div class="lab-list" id="labAlertList">
+        <div class="empty-state">ไม่มีผลแล็บผิดปกติใน Visit นี้</div>
+      </div>
+    </section>
+
+    <!-- 3. คำเตือนยา & เสนอยาสมุนไพรทางเลือก -->
+    <section class="card-section" id="secHerbs">
+      <div class="section-title">
+        <span class="title-icon">🌿</span>
+        <span>แนะนำยาสมุนไพรตามวินิจฉัย</span>
+        <span class="live-pulse-dot" id="herbRealtimeTag" data-tooltip="ตรวจจับวินิจฉัยสด Real-time (ovstdiag)"></span>
+      </div>
+      
+      <!-- กล่องเตือนยาตามการทำงานของไต / Warfarin -->
+      <div class="alert-box alert-warning" id="boxDrugAlert" style="display: none;">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+          <b id="drugAlertTitle">ข้อควรระวังเรื่องยา</b>
+          <p id="drugAlertDesc" style="white-space: pre-line;">-</p>
+        </div>
+      </div>
+
+      <!-- รายการเสนอยาสมุนไพรทางเลือก (ตามโมเดล รพ.บ้านด่านลานหอย) -->
+      <div class="herb-suggestions" id="herbSuggestionsList">
+        <div class="empty-state">พร้อมวิเคราะห์ยาสมุนไพรตามกลุ่มอาการ</div>
+      </div>
+
+      <!-- ส่วน PE Text Preview -->
+      <div class="pe-preview-box" id="pePreviewBox" style="display: none;">
+        <div class="pe-header">
+          <span class="pe-title">📝 ตรวจร่างกายแนะนำ (PE)</span>
+          <button class="btn-copy-pe" id="btnCopyPe" title="คัดลอกไปวางในช่อง PE ของ HOSxP">📋 คัดลอก PE</button>
+        </div>
+        <textarea class="pe-textarea" id="peTextarea" readonly rows="3" placeholder="ข้อความตรวจร่างกายตัวอย่าง"></textarea>
+      </div>
+    </section>
+
+    <!-- 4. แสดงวันนัดและคำนวณยา (แยกสีพื้นหลังสองส่วนชัดเจน) -->
+    <section class="card-section" id="secAppointment">
+      <div class="section-title">
+        <span class="title-icon">📅</span>
+        <span>วันนัด & คำนวณยา</span>
+      </div>
+
+      <!-- ส่วนที่ 1: วันนัดตรวจ (สีพื้นหลัง Soft Sky Blue) -->
+      <div class="appt-card" id="apptCard">
+        <div class="appt-header">
+          <div class="appt-date-label">📅 วันนัดครั้งต่อไป:</div>
+          <div class="appt-date-val" id="valApptDate">ไม่มีนัดตรวจ</div>
+        </div>
+        <div class="appt-meta" id="valApptMeta">
+          ระยะเวลานัด: <b id="valApptDaysText">- วัน</b> (<span id="valApptClinic">คลินิกเดิม</span>)
+        </div>
+      </div>
+
+      <!-- ส่วนที่ 2: คำนวณยา (สีพื้นหลัง Soft Slate / Mint แยกกัน) -->
+      <div class="pill-calc-card" id="pillCalcCard">
+        <!-- ชิปเลือกจำนวนวันด่วนเพื่อคำนวณยา -->
+        <div class="days-selector">
+          <span class="days-label">คำนวณสำหรับ:</span>
+          <div class="days-chips" id="daysChips">
+            <button class="chip-day" data-days="7">7 วัน</button>
+            <button class="chip-day" data-days="14">14 วัน</button>
+            <button class="chip-day active" data-days="28">28 วัน</button>
+            <button class="chip-day" data-days="30">30 วัน</button>
+            <button class="chip-day" data-days="60">60 วัน</button>
+            <button class="chip-day" data-days="90">90 วัน</button>
+          </div>
+          <div class="custom-days-row">
+            <input type="number" id="inputCustomDays" placeholder="ระบุวัน" min="1" max="365" style="width: 70px;" />
+            <span style="font-size: 11px; color: #64748b;">วัน</span>
+          </div>
+        </div>
+
+        <div class="pill-calc-box" id="pillCalcBox">
+          <div class="calc-title">🔢 จำนวนเม็ดยาที่ต้องสั่งจ่าย (<span id="calcDaysDisplay">28</span> วัน):</div>
+          <div class="calc-grid">
+            <div class="calc-row">
+              <span>• 1 x 1 (วันละ 1 เม็ด - od):</span>
+              <b id="calcOd">28 เม็ด</b>
+            </div>
+            <div class="calc-row">
+              <span>• 1 x 2 (วันละ 2 เม็ด - bid):</span>
+              <b id="calcBid">56 เม็ด</b>
+            </div>
+            <div class="calc-row">
+              <span>• 1 x 3 (วันละ 3 เม็ด - tid):</span>
+              <b id="calcTid">84 เม็ด</b>
+            </div>
+            <div class="calc-row">
+              <span>• 1 x 4 (วันละ 4 เม็ด - qid):</span>
+              <b id="calcQid">112 เม็ด</b>
+            </div>
+            <div class="calc-row">
+              <span>• 2 x 2 (ครั้งละ 2 เม็ด วันละ 2 ครั้ง):</span>
+              <b id="calc2x2">112 เม็ด</b>
+            </div>
+            <div class="calc-row">
+              <span>• 1 x hs (ก่อนนอน 1 เม็ด):</span>
+              <b id="calcHs">28 เม็ด</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── Modal ข้อมูลยาสมุนไพร / อุปกรณ์กายภาพ (โมเดล รพ.บ้านด่านลานหอย) ─── -->
+  <div class="modal-overlay" id="herbModal" style="display: none;">
+    <div class="herb-modal-card">
+      <div class="herb-modal-header">
+        <div class="herb-modal-badge" id="herbModalBadge">HERBAL MEDICINE INFORMATION</div>
+        <button class="btn-modal-close" id="btnCloseHerbModal" title="ปิด">✕</button>
+      </div>
+      <h3 class="herb-modal-title" id="herbModalTitle">ฟ้าทะลายโจร</h3>
+      <div class="herb-modal-subtitle" id="herbModalScientific">Andrographis paniculata (Burm.f.) Nees</div>
+
+      <div class="herb-modal-body">
+        <div class="herb-detail-box box-indication">
+          <div class="herb-detail-label">🌿 สรรพคุณ / ข้อบ่งชี้ (Indication)</div>
+          <div class="herb-detail-text" id="herbModalIndication">-</div>
+        </div>
+
+        <div class="herb-detail-box box-contraindication">
+          <div class="herb-detail-label">🚫 ข้อห้ามใช้ (Contraindications)</div>
+          <div class="herb-detail-text" id="herbModalContraindication">-</div>
+        </div>
+
+        <div class="herb-detail-box box-precaution">
+          <div class="herb-detail-label">⚠️ ข้อควรระวัง & ปฏิกิริยาระหว่างยา (Precautions & Interactions)</div>
+          <div class="herb-detail-text" id="herbModalPrecaution">-</div>
+        </div>
+
+        <div class="herb-detail-box box-reference">
+          <div class="herb-detail-label">📖 ข้อมูลอ้างอิง & การเบิกจ่าย สปสช.</div>
+          <div class="herb-detail-text" id="herbModalReference">-</div>
+        </div>
+      </div>
+      <div class="herb-modal-footer">
+        <button class="btn-modal-action" id="btnHerbModalDismiss">รับทราบ / ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Modal ประวัติย้อนหลัง 10 ครั้งล่าสุด (ความดัน / ชีพจร / ไต / ผลแล็บ) ─── -->
+  <div class="modal-overlay" id="historyModal" style="display: none;">
+    <div class="history-modal-card">
+      <div class="history-modal-header">
+        <div class="history-modal-badge" id="histBadge">CLINICAL TREND HISTORY</div>
+        <button class="btn-modal-close" id="btnCloseHistModal" title="ปิด">✕</button>
+      </div>
+      <h3 class="history-modal-title" id="histTitle">ประวัติย้อนหลัง</h3>
+      <div class="history-modal-subtitle" id="histSubtitle">HN: - · ผู้ป่วย: -</div>
+
+      <!-- แถบสลับโหมด: รองรับทั้ง ไต (แนวโน้ม/ปรับยา) และ สัญญาณชีพ (ความดัน/น้ำหนัก) -->
+      <div class="modal-tabs" id="histModalTabs" style="display: none;">
+        <button class="modal-tab active" id="tabHist1" data-tab="tab1">📈 แนวโน้มค่าไต</button>
+        <button class="modal-tab" id="tabHist2" data-tab="tab2">💊 การปรับขนาดยา</button>
+      </div>
+
+      <!-- สรุปสถิติด่วน (Summary Stats) -->
+      <div class="history-stats-bar" id="histStatsBar" style="display: none;">
+        <div class="stat-pill"><span class="stat-lbl">เฉลี่ย:</span> <b id="statAvg">-</b></div>
+        <div class="stat-pill"><span class="stat-lbl">สูงสุด:</span> <b id="statMax">-</b></div>
+        <div class="stat-pill"><span class="stat-lbl">ต่ำสุด:</span> <b id="statMin">-</b></div>
+      </div>
+
+      <div class="history-modal-body" id="histModalBody">
+        <!-- 1. ตารางประวัติ 10 ครั้ง -->
+        <div class="history-table-wrapper" id="wrapHistTable">
+          <!-- แถบ Toggle สลับเกณฑ์การประเมินค่าไต (HOSxP ทั่วไป vs สากล KDIGO) -->
+          <div class="hist-criteria-toggle-bar" id="renalCriteriaToggleBar" style="display: none;">
+            <span class="criteria-toggle-label">เกณฑ์การแสดงผล:</span>
+            <div class="toggle-pill-group">
+              <button type="button" class="btn-toggle-pill active" id="btnCriteriaHosxp" data-mode="hosxp">📋 HOSxP ดั้งเดิม (Stage 1-5)</button>
+              <button type="button" class="btn-toggle-pill" id="btnCriteriaKdigo" data-mode="kdigo">🔬 สากล KDIGO (Cat. G1-5 & 48h/7d AKI)</button>
+            </div>
+          </div>
+
+          <!-- แถบ Quick Chips สลับรายการผลแล็บ (เมื่อเปิดดูประวัติแล็บ) -->
+          <div class="lab-quick-chips" id="labQuickChips" style="display: none;">
+            <span class="lab-chips-label">รายการแล็บ:</span>
+            <div class="toggle-pill-group" id="labChipGroup">
+              <button type="button" class="btn-toggle-pill" data-lab="cbc">CBC</button>
+              <button type="button" class="btn-toggle-pill" data-lab="potassium">Potassium (K)</button>
+              <button type="button" class="btn-toggle-pill" data-lab="sodium">Sodium (Na)</button>
+              <button type="button" class="btn-toggle-pill" data-lab="bun">BUN</button>
+              <button type="button" class="btn-toggle-pill" data-lab="ast">SGOT</button>
+              <button type="button" class="btn-toggle-pill" data-lab="alt">SGPT</button>
+              <button type="button" class="btn-toggle-pill" data-lab="uric">Uric Acid</button>
+            </div>
+          </div>
+
+          <!-- การ์ดแสดงกราฟเส้นเปรียบเทียบแนวโน้ม (History Trend Line Chart) -->
+          <div class="history-chart-card" id="histChartCard" style="display: none;">
+            <div class="hist-chart-header">
+              <div class="hist-chart-title-group">
+                <span class="hist-chart-icon">📈</span>
+                <span class="hist-chart-title" id="histChartTitle">กราฟแนวโน้ม</span>
+                <div class="hist-chart-legend" id="histChartLegend"></div>
+              </div>
+              <button type="button" class="btn-chart-toggle" id="btnToggleChart" title="ย่อ/ขยายกราฟ">📉 ซ่อนกราฟ</button>
+            </div>
+            <div class="hist-chart-body" id="histChartBody">
+              <div class="hist-chart-svg-wrap">
+                <svg id="histChartSvg" class="hist-chart-svg" viewBox="0 0 540 135" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+          </div>
+
+          <table class="history-table" id="histTable">
+            <thead id="histThead"></thead>
+            <tbody id="histTbody">
+              <tr><td colspan="5" style="text-align: center; padding: 20px;">กำลังโหลดข้อมูล...</td></tr>
+            </tbody>
+          </table>
+          <!-- ปุ่มดูประวัติเพิ่มเติม ต่อล่างแถวข้อมูลเป็นปุ่มแบบเส้นประ -->
+          <div class="table-load-more-wrap" id="wrapTableLoadMore" style="display: none;">
+            <button class="btn-load-more-dashed" id="btnHistLoadMore">ดูประวัติเพิ่มเติม</button>
+          </div>
+        </div>
+
+        <!-- 2. ตารางแนวทางการปรับขนาดยาตาม CrCl (Renal Dose Guide) -->
+        <div class="renal-dose-wrapper" id="wrapRenalDose" style="display: none;">
+          <div class="renal-dose-banner" id="renalDoseBanner">
+            <div class="banner-title" id="renalDoseBannerTitle">🛡️ คำแนะนำปรับยาตามค่าไต</div>
+            <div class="banner-desc" id="renalDoseBannerDesc">CrCl: - mL/min · eGFR: -</div>
+          </div>
+
+          <!-- Toggle เลือกน้ำหนักที่ใช้คำนวณ Cockcroft-Gault -->
+          <div class="dose-weight-toggle-bar" id="doseWeightToggleBar">
+            <span class="dose-weight-label">สูตรน้ำหนัก:</span>
+            <div class="toggle-pill-group">
+              <button type="button" class="btn-toggle-pill active" id="btnWeightAbw" data-weight="abw">น้ำหนักจริง</button>
+              <button type="button" class="btn-toggle-pill" id="btnWeightAdjbw" data-weight="adjbw">ปรับลด(AdjBW)</button>
+              <button type="button" class="btn-toggle-pill" id="btnWeightIbw" data-weight="ibw">อุดมคติ</button>
+            </div>
+          </div>
+          <div class="dose-obese-alert" id="doseObeseAlert" style="display: none;">
+            💡 <b>คำแนะนำเภสัชกรรมคลินิก:</b> ผู้ป่วยมีน้ำหนักเกินเกณฑ์มาตรฐาน (&gt;120% IBW) แนะนำให้กดสลับเป็น <b>น้ำหนักปรับลด (AdjBW)</b> เพื่อป้องกันการคำนวณ CrCl สูงเกินจริง
+          </div>
+
+          <div class="dose-filter-chips" id="doseFilterChips">
+            <button class="chip-filter active" data-cat="action_required">⚠️ ต้องปรับขนาด</button>
+            <button class="chip-filter" data-cat="patient_meds">💊 ยาเคสนี้</button>
+            <button class="chip-filter" data-cat="all">ทั้งหมด</button>
+            <button class="chip-filter" data-cat="dm">เบาหวาน</button>
+            <button class="chip-filter" data-cat="nsaids">แก้ปวด NSAIDs</button>
+            <button class="chip-filter" data-cat="gout">เกาต์</button>
+            <button class="chip-filter" data-cat="antibiotics">ฆ่าเชื้อ</button>
+            <button class="chip-filter" data-cat="cv">หัวใจ/ความดัน</button>
+            <button class="chip-filter" data-cat="neuro">ปลายประสาท</button>
+          </div>
+          <div id="renalDoseList" class="renal-dose-list">
+            <!-- Dynamic Drug Adjustment Cards -->
+          </div>
+        </div>
+      </div>
+
+      <div class="history-modal-footer">
+        <button class="btn-modal-action" id="btnHistClose">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Floating Tooltip Container สไตล์ Modern Slate ─── -->
+  <div id="appFloatingTooltip" class="app-floating-tooltip"></div>
+
+  <script src="assistant.js"></script>
+</body>
+</html>

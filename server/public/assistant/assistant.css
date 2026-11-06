@@ -1,0 +1,2321 @@
+/* sidebar-doctor-assistant/assistant.css — Modern Hospital Sidebar UI */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body, button, input, select, textarea {
+  font-family: 'Prompt', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-size: 13.5px;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* ─── Header ─── */
+.assistant-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.app-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.icon-pulse {
+  font-size: 11px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.font-scaler-box {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 1px 4px;
+  gap: 2px;
+}
+
+.btn-font-scale {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  padding: 2px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.btn-font-scale:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.font-scale-text {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0f766e;
+  min-width: 32px;
+  text-align: center;
+  user-select: none;
+}
+
+.sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid #a7f3d0;
+  font-weight: 600;
+}
+
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.patient-card {
+  position: relative;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.patient-main-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.hn-badge-box {
+  background: #1e40af;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13.5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(30, 64, 175, 0.25);
+  white-space: nowrap;
+}
+
+.dep-pill {
+  margin-left: auto;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.queue-badge {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.patient-names {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.patient-name {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.patient-sub-left {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.patient-vn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.vn-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.vn-val {
+  font-family: monospace;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.4px;
+}
+
+.btn-refresh {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-refresh:hover {
+  background: #e2e8f0;
+}
+
+/* ─── Scrollable Body ─── */
+.assistant-body {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Card Sections ─── */
+.card-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 10px;
+}
+
+.title-icon {
+  font-size: 14px;
+}
+
+.badge-count {
+  margin-left: auto;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* ─── Metrics Grid (eGFR / CrCl / BP / Sugar) ─── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.metric-box,
+.metric-box *,
+.metric-box.clickable-metric,
+.metric-box.clickable-metric * {
+  cursor: pointer !important;
+}
+
+.metric-box {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: center;
+  position: relative;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.metric-box:hover,
+.metric-box.clickable-metric:hover {
+  transform: translateY(-3px) !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.28) !important;
+  outline: 2px solid #0f766e !important;
+  outline-offset: -1px;
+  background: #f0fdfa !important;
+}
+
+.metric-box:hover .metric-label,
+.metric-box.clickable-metric:hover .metric-label {
+  color: #0f766e !important;
+}
+
+.metric-box:active,
+.metric-box.clickable-metric:active {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 3px 8px rgba(15, 118, 110, 0.25) !important;
+}
+
+.metric-click-hint {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  padding: 2px 7px;
+  letter-spacing: 0.2px;
+  transition: all 0.18s ease;
+  pointer-events: none;
+}
+
+.metric-box:hover .metric-click-hint,
+.metric-box.clickable-metric:hover .metric-click-hint {
+  background: #0f766e !important;
+  color: #ffffff !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.35) !important;
+  transform: scale(1.05);
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #475569;
+  font-weight: 700;
+  margin-bottom: 3px;
+  text-align: left;
+}
+
+.metric-val {
+  font-size: 23px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+  margin: 2px 0;
+}
+
+.metric-unit {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.metric-sub {
+  font-size: 12px;
+  color: #059669;
+  font-weight: 700;
+  margin-top: 5px;
+  background: #f8fafc;
+  border-radius: 4px;
+  padding: 2px 4px;
+  display: inline-block;
+}
+
+/* ─── Vitals Strip (น้ำหนัก, ส่วนสูง, BMI) ─── */
+.vitals-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.vitals-strip:hover {
+  background: #f0fdfa;
+  border-color: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.15);
+}
+.vitals-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.vitals-strip-link {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #99f6e4;
+  padding: 2px 7px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.vitals-strip:hover .vitals-strip-link {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: #0f766e;
+}
+
+/* Stage Warning Colors */
+.metric-box.stage-good {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.metric-box.stage-good .metric-val { color: #15803d; }
+
+.metric-box.stage-warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.metric-box.stage-warn .metric-val { color: #b45309; }
+.metric-box.stage-warn .metric-sub { color: #b45309; }
+
+.metric-box.stage-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.metric-box.stage-danger .metric-val { color: #b91c1c; }
+.metric-box.stage-danger .metric-sub { color: #b91c1c; }
+
+/* ─── Lab Alerts ─── */
+.lab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lab-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.lab-item.abnormal {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.lab-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.lab-vals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lab-val {
+  font-weight: 700;
+}
+
+.lab-flag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.lab-flag.high { background: #fee2e2; color: #dc2626; }
+.lab-flag.low { background: #e0f2fe; color: #0284c7; }
+.lab-flag.critical { background: #b91c1c; color: #ffffff; animation: pulseCrit 1.5s infinite; }
+.lab-flag.abnormal { background: #fef3c7; color: #b45309; }
+
+.lab-normal-ref {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  margin-left: 4px;
+}
+
+@keyframes pulseCrit {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* ─── Drug Alerts & Herbs ─── */
+.alert-box {
+  display: flex;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.alert-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.alert-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.herb-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.herb-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.herb-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 2px;
+}
+
+.herb-indication {
+  font-size: 11px;
+  color: #475569;
+}
+
+/* ─── Appointment & Pill Calc (แยกสีพื้นหลังสองส่วนชัดเจน) ─── */
+.appt-card {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(186, 230, 253, 0.25);
+}
+
+.appt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.appt-date-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.appt-date-val {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0c4a6e;
+}
+
+.appt-meta {
+  font-size: 11.5px;
+  color: #0284c7;
+  padding-top: 4px;
+  border-top: 1px dashed #bae6fd;
+}
+
+.pill-calc-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 11px 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.pill-calc-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+
+.calc-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0369a1;
+  margin-bottom: 6px;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #334155;
+  margin-bottom: 3px;
+}
+.calc-row b {
+  color: #0f172a;
+}
+
+/* ─── Empty State ─── */
+.empty-state {
+  text-align: center;
+  font-size: 11.5px;
+  color: #94a3b8;
+  padding: 10px 0;
+}
+
+/* ─── Action Dock ─── */
+.action-dock {
+  display: flex;
+  margin-top: 4px;
+  padding-bottom: 10px;
+}
+
+.btn-action {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-action.full-width {
+  width: 100%;
+}
+
+/* ─── Search VN Bar ─── */
+.vn-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-sm {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-sm:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* ─── Search Box & Dropdown (HN / Name / VN) ─── */
+.patient-search-box {
+  margin-top: 8px;
+  position: relative;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #0f766e;
+  border-radius: 8px;
+  padding: 4px 8px;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
+  gap: 6px;
+}
+
+.search-icon {
+  font-size: 12px;
+  color: #0f766e;
+}
+
+.search-input-wrap input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-family: inherit;
+  color: #0f172a;
+  background: transparent;
+}
+
+.btn-search-clear {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.btn-search-clear:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.search-dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.search-item:hover {
+  background: #f0fdfa;
+  border-left: 3px solid #0f766e;
+}
+.search-item:last-child {
+  border-bottom: none;
+}
+
+.search-item-line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-hn-badge {
+  background: #ccfbf1;
+  color: #0f766e;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #99f6e4;
+}
+
+.search-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.search-item-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.search-item-line2 {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.search-loading, .search-empty {
+  padding: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ─── Days Chips & Selector ─── */
+.days-selector {
+  margin-bottom: 8px;
+}
+.days-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  display: block;
+  margin-bottom: 4px;
+}
+.days-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.chip-day {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chip-day:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.chip-day.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+.custom-days-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.custom-days-row input {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+}
+.custom-days-row input:focus {
+  border-color: #0284c7;
+}
+
+.calc-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ─── Alert Toast Notification System (โมเดล รพ.บ้านด่านลานหอย) ─── */
+.toast-container {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.alert-toast {
+  pointer-events: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-left: 5px solid #0f766e;
+  overflow: hidden;
+  animation: toastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s ease;
+  position: relative;
+  border-top: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+@keyframes toastSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-closing {
+  opacity: 0 !important;
+  transform: translateY(-20px) scale(0.95) !important;
+  transition: all 0.25s ease !important;
+}
+
+.alert-toast.toast-danger {
+  border-left-color: #dc2626;
+  background: linear-gradient(to right, #fff5f5, #ffffff 35%);
+}
+
+.alert-toast.toast-warning {
+  border-left-color: #d97706;
+  background: linear-gradient(to right, #fffbeb, #ffffff 35%);
+}
+
+.alert-toast.toast-success {
+  border-left-color: #059669;
+  background: linear-gradient(to right, #f0fdf4, #ffffff 35%);
+}
+
+.alert-toast.toast-info {
+  border-left-color: #0284c7;
+  background: linear-gradient(to right, #f0f9ff, #ffffff 35%);
+}
+
+.toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px 6px 14px;
+}
+
+.toast-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.toast-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.toast-meta {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 3px 6px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.toast-close:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.toast-body {
+  padding: 4px 14px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toast-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.toast-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.tag-red {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.tag-amber {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.tag-green {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.tag-blue {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #bae6fd;
+}
+
+.tag-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #e9d5ff;
+}
+
+.toast-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-toast-link {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-toast-link:hover {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+}
+
+.toast-progress-bar {
+  height: 3px;
+  background: #0f766e;
+  width: 100%;
+  transform-origin: left;
+  animation: toastProgress 5.5s linear forwards;
+}
+
+@keyframes toastProgress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ─── Clickable Herbal Cards ─── */
+.herb-card {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.herb-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  border-color: #0f766e;
+}
+.herb-card-click-hint {
+  font-size: 10.5px;
+  color: #0f766e;
+  font-weight: 600;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.herb-card-instrument {
+  border-left: 4px solid #7c3aed;
+  background: #faf5ff;
+}
+.herb-card-instrument:hover {
+  border-color: #6d28d9;
+}
+
+/* ─── Herbal & Instrument Information Modal (โมเดล รพ.บ้านด่านลานหอย) ─── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(3px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.herb-modal-card {
+  background: #ffffff;
+  width: min(92vw, 580px);
+  max-width: 620px;
+  max-height: 88vh;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.2s ease, max-width 0.2s ease;
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.herb-modal-header {
+  padding: 14px 16px 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.herb-modal-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #fde68a;
+}
+
+.btn-modal-close {
+  background: #f1f5f9;
+  border: none;
+  font-size: 15px;
+  color: #64748b;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.btn-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.herb-modal-title {
+  padding: 0 16px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.herb-modal-subtitle {
+  padding: 2px 16px 12px 16px;
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.herb-modal-body {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.herb-detail-box {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.box-indication {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.box-contraindication {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.box-precaution {
+  background: #fffbeb;
+  border: 1px solid #fef08a;
+  color: #854d0e;
+}
+
+.box-reference {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.herb-detail-label {
+  font-weight: 700;
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+
+.herb-detail-text {
+  font-size: 12px;
+  white-space: pre-line;
+}
+
+.herb-modal-footer {
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-modal-action {
+  background: #0f766e;
+  color: #ffffff;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-modal-action:hover {
+  background: #115e59;
+}
+
+/* ─── Lab History Item & History Modal ─── */
+.lab-item.clickable-lab {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.lab-item.clickable-lab:hover {
+  background: #f0fdfa;
+  border-color: #0f766e;
+  transform: translateX(3px);
+}
+.lab-item.clickable-lab::after {
+  content: "📈";
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.history-modal-card {
+  background: #ffffff;
+  width: min(94vw, 840px);
+  max-width: 860px;
+  max-height: 90vh;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.2s ease, max-width 0.2s ease;
+}
+
+.history-modal-header {
+  padding: 16px 22px 6px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-modal-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid #bae6fd;
+}
+
+.history-modal-title {
+  padding: 0 22px;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.history-modal-subtitle {
+  padding: 4px 22px 10px 22px;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.history-stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 8px 22px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.stat-pill {
+  font-size: 11.5px;
+  color: #334155;
+}
+.stat-lbl {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.history-modal-body {
+  padding: 12px 18px;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.history-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.history-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  padding: 7px 8px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.history-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+.history-table tr:hover {
+  background-color: #f8fafc;
+}
+
+/* ไฮไลท์สีพื้นหลังแถวประวัติตามระดับความรุนแรง (ถ้าปกติไม่มีสี) */
+.history-table tr.row-danger {
+  background-color: #fef2f2 !important;
+}
+.history-table tr.row-danger:hover {
+  background-color: #fee2e2 !important;
+}
+.history-table tr.row-warn {
+  background-color: #fffbeb !important;
+}
+.history-table tr.row-warn:hover {
+  background-color: #fef3c7 !important;
+}
+
+.badge-val-danger {
+  color: #dc2626;
+  font-weight: 700;
+  background: #fee2e2;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.badge-val-warn {
+  color: #d97706;
+  font-weight: 700;
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.badge-val-good {
+  color: #059669;
+  font-weight: 600;
+}
+
+/* คลาสสีตัวอักษรสำหรับค่าในตาราง History Modal (ประหยัดพื้นที่ ไม่กินที่แบบ badge) */
+.val-text {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.val-text.text-danger {
+  color: #dc2626 !important;
+}
+.val-text.text-warn {
+  color: #d97706 !important;
+}
+.val-text.text-normal {
+  color: #16a34a !important;
+}
+.val-text.text-muted {
+  color: #64748b !important;
+  font-weight: 500;
+}
+
+.cell-date-tip {
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  text-decoration: underline dotted #94a3b8;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.cell-date-tip:hover {
+  color: #0f766e;
+  text-decoration-color: #0f766e;
+}
+
+/* ─── Toggle Pill Switch ใน History Modal ─── */
+
+/* ─── การ์ดแสดงกราฟเส้นเปรียบเทียบแนวโน้ม (History Trend Chart) ─── */
+.history-chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.hist-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.hist-chart-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hist-chart-icon {
+  font-size: 13px;
+}
+
+.hist-chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.hist-chart-legend {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hist-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #475569;
+}
+
+.hist-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.btn-chart-toggle {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-chart-toggle:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.hist-chart-body {
+  transition: all 0.2s ease;
+}
+
+.hist-chart-svg-wrap {
+  width: 100%;
+  height: 135px;
+  overflow: hidden;
+  position: relative;
+}
+
+.hist-chart-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-point {
+  cursor: pointer;
+  transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+
+.chart-point:hover {
+  r: 6.5px;
+  stroke-width: 3px;
+}
+
+.hist-criteria-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.dose-weight-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+.criteria-toggle-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.dose-weight-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dose-weight-toggle-bar .toggle-pill-group {
+  display: flex;
+  flex: 1;
+  background: #e2e8f0;
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+}
+
+.dose-weight-toggle-bar .btn-toggle-pill {
+  flex: 1;
+  text-align: center;
+  padding: 4px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.toggle-pill-group {
+  display: inline-flex;
+  background: #e2e8f0;
+  padding: 2px;
+  border-radius: 6px;
+  gap: 2px;
+}
+
+.btn-toggle-pill {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-toggle-pill:hover {
+  color: #0f172a;
+}
+
+.btn-toggle-pill.active {
+  background: #ffffff;
+  color: #0f766e;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.dose-obese-alert {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  color: #92400e;
+  margin-bottom: 8px;
+  line-height: 1.45;
+}
+
+.history-modal-footer {
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-modal-footer .btn-modal-action {
+  min-width: 120px;
+  padding: 9px 32px;
+  font-size: 13.5px;
+  border-radius: 8px;
+}
+
+/* ─── ปุ่มดูประวัติเพิ่มเติม ต่อล่างแถวข้อมูล (เส้นประ Dashed) ─── */
+.table-load-more-wrap {
+  padding: 10px 0 4px 0;
+  width: 100%;
+}
+
+.btn-load-more-dashed {
+  width: 100%;
+  background: #f0fdfa;
+  border: 1.5px dashed #0d9488;
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-load-more-dashed:hover {
+  background: #ccfbf1;
+  border-color: #0f766e;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.18);
+  transform: translateY(-1px);
+}
+
+.btn-load-more {
+  background: #ffffff;
+  border: 1.5px solid #0f766e;
+  color: #0f766e;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-load-more:hover {
+  background: #0f766e;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+/* ─── Online Pulsing Dot (สำหรับตรวจจับวินิจฉัยสดแบบออนไลน์ จุดเขียวกระพริบสมูท) ─── */
+.live-pulse-dot {
+  width: 9px;
+  height: 9px;
+  background-color: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: auto;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: liveDotPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@keyframes liveDotPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* ─── Global Modern Floating Tooltip (สไตล์ Slate มืด เรียบหรู ไร้ดีเลย์) ─── */
+.app-floating-tooltip {
+  position: fixed;
+  z-index: 100000;
+  pointer-events: none;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.2px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+.app-floating-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* ─── Realtime Badge & PE Text Preview (โมเดล รพ.บ้านด่านลานหอย) ─── */
+.realtime-badge {
+  margin-left: auto;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: pulseRealtime 2s infinite;
+}
+
+@keyframes pulseRealtime {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+
+.pe-preview-box {
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.pe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pe-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-copy-pe {
+  background: #0f766e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-copy-pe:hover {
+  background: #115e59;
+  transform: translateY(-1px);
+}
+
+.btn-copy-pe:active {
+  transform: translateY(0);
+}
+
+.pe-textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1e293b;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+  min-height: 70px;
+  box-sizing: border-box;
+}
+
+.pe-textarea:focus {
+  outline: none;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+}
+
+/* ─── Modal Tabs (History Trend vs Renal Dose Guide) ─── */
+.modal-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 22px 16px 22px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 12px;
+  font-family: 'Prompt', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.modal-tab {
+  font-family: 'Prompt', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #475569;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.modal-tab:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.modal-tab.active {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: #0f766e;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(15, 118, 110, 0.28);
+}
+
+/* ─── Renal Dose Guide Table & Cards ─── */
+.renal-dose-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.renal-dose-banner {
+  background: #f0fdfa;
+  border: 1.5px solid #99f6e4;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f766e;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.banner-desc {
+  font-size: 13px;
+  color: #115e59;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.dose-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-filter {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-filter:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.chip-filter.active {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+}
+
+.renal-dose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.renal-drug-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  border-left: 5px solid #94a3b8;
+  transition: all 0.15s ease;
+}
+
+.renal-drug-card.card-contraindicated {
+  border-left-color: #ef4444;
+  background: #fef2f2;
+}
+
+.renal-drug-card.card-reduce {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.renal-drug-card.card-standard {
+  border-left-color: #10b981;
+  background: #ffffff;
+}
+
+.renal-drug-card.patient-prescribed {
+  box-shadow: 0 0 0 2px #ef4444, 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.drug-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.drug-name-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.drug-name {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.drug-category-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.badge-prescribed-now {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  animation: pulseBadge 1.8s infinite;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+.drug-action-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.drug-action-badge.badge-contraindicated {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.drug-action-badge.badge-reduce {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.drug-action-badge.badge-standard {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.drug-cutoff {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.drug-recommendation {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
+.drug-caution {
+  font-size: 12px;
+  color: #b91c1c;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* ─── Font Scale Classes (ปรับขนาดตัวอักษรแบบได้สัดส่วน ไม่ล้นขอบจอ) ─── */
+body.scale-90 {
+  font-size: 12.5px;
+}
+body.scale-90 .patient-name { font-size: 15px; }
+body.scale-90 .metric-val { font-size: 20px; }
+body.scale-90 .metric-label { font-size: 11px; }
+body.scale-90 .section-title { font-size: 13.5px; }
+body.scale-90 .history-table { font-size: 11px; }
+body.scale-90 .history-table th, body.scale-90 .history-table td { font-size: 11px; padding: 5px 6px; }
+
+body.scale-100 {
+  /* Default 100% Base */
+}
+
+body.scale-110 {
+  font-size: 14.5px;
+}
+body.scale-110 .patient-name { font-size: 17.5px; }
+body.scale-110 .metric-val { font-size: 25px; }
+body.scale-110 .metric-label { font-size: 13px; }
+body.scale-110 .section-title { font-size: 16px; }
+body.scale-110 .history-table { font-size: 13px; }
+body.scale-110 .history-table th, body.scale-110 .history-table td { font-size: 12.5px; padding: 8px 10px; }
+
+body.scale-120 {
+  font-size: 15.5px;
+}
+body.scale-120 .patient-name { font-size: 19px; }
+body.scale-120 .metric-val { font-size: 27px; }
+body.scale-120 .metric-label { font-size: 14px; }
+body.scale-120 .section-title { font-size: 17px; }
+body.scale-120 .history-table { font-size: 13.5px; }
+body.scale-120 .history-table th, body.scale-120 .history-table td { font-size: 13.5px; padding: 8px 10px; }
+
+body.scale-130 {
+  font-size: 16.5px;
+}
+body.scale-130 .patient-name { font-size: 20.5px; }
+body.scale-130 .metric-val { font-size: 29px; }
+body.scale-130 .metric-label { font-size: 15px; }
+body.scale-130 .section-title { font-size: 18px; }
+body.scale-130 .history-table { font-size: 14px; }
+body.scale-130 .history-table th, body.scale-130 .history-table td { font-size: 14px; padding: 9px 10px; }
+
+
+/* ─── สไตล์ปุ่มดูกราฟในส่วนแจ้งเตือนผลแล็บ ─── */
+.btn-lab-item-chart {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-lab-item-chart:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.btn-open-lab-trend-empty {
+  margin-top: 8px;
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-open-lab-trend-empty:hover {
+  background: #d1fae5;
+  border-color: #34d399;
+  color: #047857;
+}
+
+.lab-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.lab-chips-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+}
+
+
+/* ─── สไตล์ปุ่มและ Dropdown เลือก Visit ─── */
+.btn-select-visit {
+  background: #ffffff;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1.5px 7px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.08);
+  margin-left: 4px;
+}
+.btn-select-visit:hover {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.visit-dropdown-list {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18);
+  max-height: 280px;
+  overflow-y: auto;
+  position: absolute;
+  top: 100%;
+  left: 6px;
+  right: 6px;
+  margin-top: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.visit-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.15s ease;
+}
+.visit-item:last-child {
+  border-bottom: none;
+}
+.visit-item:hover {
+  background: #f0fdfa;
+}
+.visit-item.active {
+  background: #ecfdf5;
+  border-left: 3px solid #059669;
+}
+.visit-item-line1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.visit-item-dep {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #0d9488;
+  background: #f0fdfa;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid #ccfbf1;
+}
+.visit-item-line2 {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+/* ─── ปรับปุ่ม ดูกราฟแนวโน้มแล็บ ให้สวยงาม ทันสมัย ─── */
+.btn-lab-header-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.08);
+  white-space: nowrap;
+}
+
+.btn-lab-header-trend:hover {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff;
+  border-color: #0f766e;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+  transform: translateY(-1px);
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ตั้งค่า Sidebar Doctor Assistant</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f7fb;color:#142b3b;font:15px/1.55 "Segoe UI",Tahoma,sans-serif}
+    main{max-width:760px;margin:36px auto;padding:0 18px}.panel{background:#fff;border:1px solid #dbe6ed;border-radius:16px;padding:26px;box-shadow:0 12px 36px #21445e12}
+    h1{margin:0 0 5px;font-size:25px}.sub{color:#587184;margin:0 0 22px}.step{font-size:17px;font-weight:700;margin:22px 0 10px;padding-bottom:7px;border-bottom:1px solid #e7eef3}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:13px;font-weight:650;color:#334d5d}input,textarea{width:100%;margin-top:5px;padding:10px 11px;border:1px solid #cbd9e1;border-radius:8px;font:inherit;color:#142b3b;background:#fff}input:focus,textarea:focus{outline:2px solid #62b6aa;border-color:#62b6aa}.wide{grid-column:1/-1}.help{color:#6c7f8b;font-size:12px;margin:4px 0 0}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}button{border:0;border-radius:9px;padding:11px 17px;font:inherit;font-weight:700;cursor:pointer;background:#11675e;color:white}button.secondary{background:#e9f2f5;color:#174153}.status{padding:10px 12px;border-radius:8px;margin-top:13px;display:none}.status.ok{display:block;background:#e5f7ee;color:#17613b}.status.error{display:block;background:#fff0ee;color:#8a2d22}.notice{background:#fff8df;color:#69511d;border-radius:9px;padding:11px 13px;font-size:13px;margin-top:18px}.badge{display:inline-block;background:#e5f2f1;color:#17675f;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}@media(max-width:600px){main{margin:15px auto}.panel{padding:18px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+  </style>
+</head>
+<body><main><section class="panel">
+  <span class="badge">ตั้งค่าครั้งแรก / ผู้ดูแลระบบ</span>
+  <h1>Sidebar Doctor Assistant</h1>
+  <p class="sub">ตั้งค่าการเชื่อมต่อ HOSxP และข้อมูลของโรงพยาบาล ระบบนี้เก็บเฉพาะค่าที่จำเป็นต่อ Sidebar และไอคอนพี่หมอ</p>
+  <div class="step">1. ข้อมูลโรงพยาบาลและ Server</div>
+  <div class="grid">
+    <label>ชื่อโรงพยาบาล<input id="hospitalName" placeholder="เช่น โรงพยาบาลตัวอย่าง"></label>
+    <label>รหัสสถานพยาบาล<input id="hospitalCode" placeholder="เช่น 12345"></label>
+    <label>พอร์ต Server<input id="serverPort" type="number" min="1" max="65535" value="3030"></label>
+    <label class="wide">IP/Prefix เครือข่ายที่อนุญาต<input id="allowedLanSubnets" value="127.0.0.1,::1,192.168.1." placeholder="127.0.0.1,::1,10.10.20."><div class="help">คั่นแต่ละรายการด้วยจุลภาค ระบุ prefix พร้อมจุดท้าย เช่น 10.10.20. เพื่ออนุญาตทั้งวงย่อย</div></label>
+  </div>
+  <div class="step">2. ฐานข้อมูล HOSxP (แนะนำบัญชีแบบอ่านอย่างเดียว)</div>
+  <div class="grid">
+    <label>Host<input id="dbHost" placeholder="IP หรือชื่อเครื่องฐานข้อมูล"></label>
+    <label>Port<input id="dbPort" type="number" value="3306"></label>
+    <label>ชื่อฐานข้อมูล<input id="dbName" placeholder="เช่น hosxp"></label>
+    <label>ผู้ใช้ฐานข้อมูล<input id="dbUser" autocomplete="off"></label>
+    <label class="wide">รหัสผ่าน<input id="dbPassword" type="password" autocomplete="new-password"><div class="help" id="passwordHelp">รหัสผ่านจะถูกเก็บไว้ใน config.json บน Server เท่านั้น และไม่ส่งให้เครื่องลูกข่าย</div></label>
+    <label>รหัส Lab Creatinine<input id="creatinineLabCode" value="155"><div class="help">ใช้ระบุรายการ Creatinine สำหรับคำนวณค่าการทำงานของไต</div></label>
+    <label>Charset คอลัมน์ชื่อผู้ป่วย<select id="searchCharset"><option value="tis620">TIS-620 / tis620_thai_ci</option><option value="utf8mb4">UTF-8 / utf8mb4</option></select><div class="help">เลือกตาม CHARACTER_SET_NAME ของ pname, fname และ lname ในฐาน HOSxP</div></label>
+  </div>
+  <div class="actions"><button class="secondary" id="testButton" type="button">ทดสอบฐานข้อมูล</button><button id="saveButton" type="button">บันทึกและเริ่มระบบ</button></div>
+  <div id="status" class="status" role="status"></div>
+  <div class="notice">เปิดหน้านี้จากเครื่อง Server ด้วย <b>http://localhost:3030/setup</b> เท่านั้น หลังบันทึกระบบจะเริ่มใหม่ แล้วเปิด Sidebar ได้ที่ <b>http://&lt;server-ip&gt;:3030/assistant/</b></div>
+</section></main>
+<script>
+const el=id=>document.getElementById(id), form=()=>({hospitalName:el('hospitalName').value,hospitalCode:el('hospitalCode').value,port:el('serverPort').value,allowedLanSubnets:el('allowedLanSubnets').value,creatinineLabCode:el('creatinineLabCode').value,searchCharset:el('searchCharset').value,hosxp:{host:el('dbHost').value,port:el('dbPort').value,database:el('dbName').value,user:el('dbUser').value,password:el('dbPassword').value}});
+function message(text,ok){const box=el('status');box.textContent=text;box.className=`status ${ok?'ok':'error'}`}
+async function request(url){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form())});const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'เกิดข้อผิดพลาด');return data}
+el('testButton').onclick=async()=>{el('testButton').disabled=true;try{const data=await request('/api/setup/test-database');message(`เชื่อมต่อสำเร็จ: ${data.database}`,true)}catch(error){message(error.message,false)}finally{el('testButton').disabled=false}};
+el('saveButton').onclick=async()=>{el('saveButton').disabled=true;try{const data=await request('/api/setup/save');message(data.message,true);setTimeout(()=>location.href=`${location.protocol}//${location.hostname}:${data.port}/assistant/`,1800)}catch(error){message(error.message,false)}finally{el('saveButton').disabled=false}};
+fetch('/api/setup/status').then(r=>r.json()).then(({config})=>{if(!config)return;el('hospitalName').value=config.hospitalName||'';el('hospitalCode').value=config.hospitalCode||'';el('serverPort').value=config.port||3030;el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||[]).join(',');el('dbHost').value=config.hosxp?.host||'';el('dbPort').value=config.hosxp?.port||3306;el('dbName').value=config.hosxp?.database||'';el('dbUser').value=config.hosxp?.user||'';el('creatinineLabCode').value=config.schema?.creatinineLabCode||'155';el('searchCharset').value=config.schema?.searchCharset||'tis620';el('passwordHelp').textContent='เว้นว่างไว้เพื่อคงรหัสผ่านเดิม'}).catch(()=>{});
+</script></body></html>

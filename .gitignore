@@ -1,0 +1,20 @@
+# Server dependencies and deployment secrets
+server/node_modules/
+server/config.json
+server/.env
+server/data/*.jsonl
+server/npm-debug.log*
+
+# Workstation configuration and generated builds
+companion/config.json
+companion/build/
+companion/dist/
+companion/__pycache__/
+companion/*.log
+companion/*.exe
+
+# Python local environments
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]

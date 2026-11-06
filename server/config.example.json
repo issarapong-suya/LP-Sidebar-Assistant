@@ -1,0 +1,21 @@
+{
+  "port": 3030,
+  "hospitalName": "โรงพยาบาลของคุณ",
+  "hospitalCode": "",
+  "hosxp": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "hosxp",
+    "user": "hosxp_readonly",
+    "password": "",
+    "connectionLimit": 10
+  },
+  "security": {
+    "allowedLanSubnets": ["127.0.0.1", "::1", "192.168.1."],
+    "apiKey": ""
+  },
+  "schema": {
+    "searchCharset": "tis620",
+    "creatinineLabCode": "155"
+  }
+}
