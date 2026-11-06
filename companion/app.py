@@ -452,7 +452,9 @@ def get_local_lan_ip(target_host=None):
     candidates = []
     if target_host:
         candidates.append(target_host)
-    candidates.extend(["192.168.100.1", "192.168.30.2", "172.16.0.1", "10.0.0.1", "8.8.8.8"])
+    # Use the configured server route when available, otherwise the public
+    # route probe. Avoid embedding any hospital-specific private subnet here.
+    candidates.append("8.8.8.8")
     for h in candidates:
         try:
             import socket
@@ -1048,7 +1050,7 @@ $txt.Size = New-Object System.Drawing.Size(420, 28)
 $form.Controls.Add($txt)
 
 $hintLabel = New-Object System.Windows.Forms.Label
-$hintLabel.Text = 'ตัวอย่าง: http://192.168.100.80:3030 หรือ http://localhost:3030'
+$hintLabel.Text = 'ตัวอย่าง: http://192.168.1.10:3030 หรือ http://localhost:3030'
 $hintLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8.5)
 $hintLabel.ForeColor = [System.Drawing.ColorTranslator]::FromHtml('#64748B')
 $hintLabel.Location = New-Object System.Drawing.Point(22, 158)
