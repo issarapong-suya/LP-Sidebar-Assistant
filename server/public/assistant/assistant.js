@@ -836,7 +836,12 @@ function renderAssistant(d, isChanged = false) {
     } else if (allergyStatus === 'none') {
       allergyBanner.classList.add('allergy-none');
       allergyStatusLabel.textContent = 'ไม่ทราบประวัติการแพ้';
-      allergyDetail.textContent = d.allergyText || screening.found_allergy || 'โปรดยืนยันกับผู้ป่วยก่อนสั่งยา';
+      const detailText = String(d.allergyText || screening.found_allergy || '').trim();
+      if (!detailText || /^(n|no|none|u|unknown|-)$/i.test(detailText)) {
+        allergyDetail.textContent = 'ไม่พบประวัติการแพ้ยาในระบบ (โปรดยืนยันกับผู้ป่วยก่อนสั่งยา)';
+      } else {
+        allergyDetail.textContent = detailText;
+      }
     } else {
       allergyBanner.classList.add('allergy-unknown');
       allergyStatusLabel.textContent = 'ยังไม่ทราบ';
@@ -3747,11 +3752,74 @@ window.openGeneralLabHistory = function() {
 };
 
 
-// ─── ระบบเลือกดู Visit ย้อนหลังของผู้ป่วย (Patient Visit Picker) ───
+// ─── ระบบเลือกดู Visit ย้อนหลังของผู้ป่วย (Patient Visit Picker พร้อมปุ่มดูเพิ่มเติม) ───
 function setupVisitPicker() {
   const btnSelect = document.getElementById('btnSelectVisit');
   const dropdown = document.getElementById('visitDropdownList');
   if (!btnSelect || !dropdown) return;
+
+  let currentVisitLimit = 12;
+
+  async function fetchAndRenderVisits(limit) {
+    dropdown.innerHTML = '<div style="padding: 12px; text-align: center; color: #64748b; font-size: 11px;">กำลังโหลดประวัติ Visit...</div>';
+    try {
+      const res = await fetch(`/api/assistant/patient-visits/${encodeURIComponent(currentHn)}?limit=${limit}`);
+      const json = await res.json();
+      const visits = json.visits || [];
+
+      if (visits.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 11px;">ไม่พบประวัติ Visit อื่นๆ</div>';
+        return;
+      }
+
+      dropdown.innerHTML = visits.map(v => {
+        const isActive = (v.vn === currentVn);
+        const timeText = v.vsttime ? v.vsttime.slice(0, 5) + ' น.' : '';
+        const diagText = v.diag_text ? `วินิจฉัย: ${escapeHtml(v.diag_text)}` : (v.cc ? `CC: ${escapeHtml(v.cc.slice(0, 45))}` : '');
+
+        return `
+          <div class="visit-item ${isActive ? 'active' : ''}" data-vn="${escapeHtml(v.vn)}">
+            <div class="visit-item-line1">
+              <span>🗓️ ${escapeHtml(v.vstdate_thai || v.vstdate)} ${timeText ? `<span style="font-size:10px;color:#64748b;font-weight:normal;">(${timeText})</span>` : ''}</span>
+              <span class="visit-item-dep">${escapeHtml(v.department_name || 'OPD')}</span>
+            </div>
+            <div class="visit-item-line2">
+              <span>VN: <b>${escapeHtml(v.vn)}</b></span>
+              <span style="color: #0f766e; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${diagText}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      dropdown.querySelectorAll('.visit-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const chosenVn = el.getAttribute('data-vn');
+          if (chosenVn) {
+            isManualSearchActive = true;
+            loadPatientData(chosenVn, currentHn);
+            dropdown.style.display = 'none';
+          }
+        });
+      });
+
+      // ถ้าผลลัพธ์มีจำนวนถึง limit แสดงปุ่มดู visit เพิ่มเติมต่อท้าย
+      if (visits.length >= limit && limit < 100) {
+        const wrapMore = document.createElement('div');
+        wrapMore.className = 'visit-load-more-wrap';
+        wrapMore.innerHTML = '<button type="button" class="btn-load-more-visits">ดู visit เพิ่มเติม (+15)</button>';
+        const btnMore = wrapMore.querySelector('button');
+        btnMore.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentVisitLimit += 15;
+          fetchAndRenderVisits(currentVisitLimit);
+        });
+        dropdown.appendChild(wrapMore);
+      }
+
+    } catch (err) {
+      dropdown.innerHTML = `<div style="padding: 12px; text-align: center; color: #ef4444; font-size: 11px;">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
+    }
+  }
 
   btnSelect.addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -3764,50 +3832,8 @@ function setupVisitPicker() {
     dropdown.style.display = isHidden ? 'flex' : 'none';
 
     if (isHidden) {
-      dropdown.innerHTML = '<div style="padding: 12px; text-align: center; color: #64748b; font-size: 11px;">กำลังโหลดประวัติ Visit...</div>';
-      try {
-        const res = await fetch(`/api/assistant/patient-visits/${encodeURIComponent(currentHn)}?limit=12`);
-        const json = await res.json();
-        const visits = json.visits || [];
-
-        if (visits.length === 0) {
-          dropdown.innerHTML = '<div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 11px;">ไม่พบประวัติ Visit อื่นๆ</div>';
-          return;
-        }
-
-        dropdown.innerHTML = visits.map(v => {
-          const isActive = (v.vn === currentVn);
-          const timeText = v.vsttime ? v.vsttime.slice(0, 5) + ' น.' : '';
-          const diagText = v.diag_text ? `วินิจฉัย: ${escapeHtml(v.diag_text)}` : (v.cc ? `CC: ${escapeHtml(v.cc.slice(0, 45))}` : '');
-
-          return `
-            <div class="visit-item ${isActive ? 'active' : ''}" data-vn="${escapeHtml(v.vn)}">
-              <div class="visit-item-line1">
-                <span>🗓️ ${escapeHtml(v.vstdate_thai || v.vstdate)} ${timeText ? `<span style="font-size:10px;color:#64748b;font-weight:normal;">(${timeText})</span>` : ''}</span>
-                <span class="visit-item-dep">${escapeHtml(v.department_name || 'OPD')}</span>
-              </div>
-              <div class="visit-item-line2">
-                <span>VN: <b>${escapeHtml(v.vn)}</b></span>
-                <span style="color: #0f766e; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${diagText}</span>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        dropdown.querySelectorAll('.visit-item').forEach(el => {
-          el.addEventListener('click', () => {
-            const chosenVn = el.getAttribute('data-vn');
-            if (chosenVn) {
-              isManualSearchActive = true;
-              loadPatientData(chosenVn, currentHn);
-              dropdown.style.display = 'none';
-            }
-          });
-        });
-
-      } catch (err) {
-        dropdown.innerHTML = `<div style="padding: 12px; text-align: center; color: #ef4444; font-size: 11px;">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</div>`;
-      }
+      currentVisitLimit = 12;
+      fetchAndRenderVisits(currentVisitLimit);
     }
   });
 

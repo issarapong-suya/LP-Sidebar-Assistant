@@ -49,7 +49,7 @@ function thaiDateFull(value) {
 }
 
 function capLimit(value, fallback = 10) {
-  return Math.min(Math.max(parseInt(value, 10) || fallback, 1), 50);
+  return Math.min(Math.max(parseInt(value, 10) || fallback, 1), 100);
 }
 
 function egfr2021(creatinine, age, sex) {
@@ -255,9 +255,14 @@ router.get('/visit-data/:vn', async (req, res) => {
       .map(row => [row.agent, row.symptom].filter(Boolean).join(': '))
       .filter(Boolean)
       .join(' · ');
+    const rawNegativeText = negativeAllergyText || (fallbackSaysNoAllergy ? fallbackAllergy : screeningAllergy);
+    const cleanNegativeText = (/^(n|no|none|u|unknown|-)$/i.test(rawNegativeText.trim()))
+      ? 'ไม่พบประวัติการแพ้ยาในระบบ (โปรดยืนยันกับผู้ป่วยก่อนสั่งยา)'
+      : (rawNegativeText || 'ไม่พบประวัติการแพ้ยาในระบบ (โปรดยืนยันกับผู้ป่วยก่อนสั่งยา)');
+
     const allergyText = positiveAllergyRows.length
       ? positiveAllergyRows.map(row => [row.agent, row.symptom].filter(Boolean).join(': ')).join(' · ')
-      : (fallbackHasAllergyText ? fallbackAllergy : negativeAllergyText || (fallbackSaysNoAllergy ? fallbackAllergy : screeningAllergy));
+      : (fallbackHasAllergyText ? fallbackAllergy : cleanNegativeText);
     const age = Number(stats[0]?.age_y ?? patient.age ?? 0);
     const [creatinineRows] = await db.execute(`SELECT lo.lab_order_result FROM lab_head lh
       JOIN lab_order lo ON lo.lab_order_number=lh.lab_order_number

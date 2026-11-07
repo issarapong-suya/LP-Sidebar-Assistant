@@ -13,7 +13,7 @@ const app = express();
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const PRODUCT_VERSION = '1';
-const PRODUCT_BUILD = '20261107.17';
+const PRODUCT_BUILD = '20261107.18';
 const companionSessions = new Map();
 const manualSessions = new Map();
 const enrollmentCodes = new Map();
@@ -148,6 +148,123 @@ function companionDeviceRecords(config = db.getConfig()) {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', configured: !!db.getConfig(), productVersion: PRODUCT_VERSION, build: PRODUCT_BUILD, time: new Date().toISOString() }));
 app.get('/api/version', (req, res) => res.json({ product: 'Sidebar Doctor Assistant', version: PRODUCT_VERSION, build: PRODUCT_BUILD }));
+
+app.get('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
+  try {
+    const pool = db.getPool();
+    const [items] = await pool.execute('SELECT lab_items_code, lab_items_name, lab_items_unit, lab_items_normal_value FROM lab_items WHERE lab_items_name IS NOT NULL AND lab_items_name != ""');
+    
+    const detected = {
+      creatinine: [],
+      potassium: [],
+      sodium: [],
+      bun: [],
+      ast: [],
+      alt: [],
+      uric: [],
+      ldl: [],
+      hct: [],
+      platelet: [],
+      uacr: []
+    };
+
+    const details = {
+      creatinine: [],
+      potassium: [],
+      sodium: [],
+      bun: [],
+      ast: [],
+      alt: [],
+      uric: [],
+      ldl: [],
+      hct: [],
+      platelet: [],
+      uacr: []
+    };
+
+    items.forEach(item => {
+      const code = String(item.lab_items_code).trim();
+      const name = String(item.lab_items_name || '').trim();
+      const nameLower = name.toLowerCase();
+
+      if (/ยกเลิก|ไม่ใช้|delete/i.test(name)) return;
+
+      if (/^creatinine$/i.test(name) || /^serum\s*creatinine$/i.test(name) || /^creatinine\s*\(cr\)$/i.test(name)) {
+        if (!/clearance|urine|fluid|ratio/i.test(nameLower)) {
+          detected.creatinine.push(code);
+          details.creatinine.push({ code, name });
+        }
+      }
+
+      if (/^potassium(\s*\(k\))?$/i.test(name) || /^k\s*(\(potassium\))?$/i.test(name) || /^serum\s*potassium$/i.test(name)) {
+        if (!/urine|fluid/i.test(nameLower)) {
+          detected.potassium.push(code);
+          details.potassium.push({ code, name });
+        }
+      }
+
+      if (/^sodium(\s*\(na\))?$/i.test(name) || /^na\s*(\(sodium\))?$/i.test(name) || /^serum\s*sodium$/i.test(name)) {
+        if (!/urine|fluid/i.test(nameLower)) {
+          detected.sodium.push(code);
+          details.sodium.push({ code, name });
+        }
+      }
+
+      if (/^bun$/i.test(name) || /^blood\s*urea\s*nitrogen$/i.test(name)) {
+        if (!/fluid/i.test(nameLower)) {
+          detected.bun.push(code);
+          details.bun.push({ code, name });
+        }
+      }
+
+      if (/^sgot(\s*\(ast\))?$/i.test(name) || /^ast(\s*\(sgot\))?$/i.test(name)) {
+        detected.ast.push(code);
+        details.ast.push({ code, name });
+      }
+
+      if (/^sgpt(\s*\(alt\))?$/i.test(name) || /^alt(\s*\(sgpt\))?$/i.test(name)) {
+        detected.alt.push(code);
+        details.alt.push({ code, name });
+      }
+
+      if (/^(serum\s*)?uric(\s*acid)?$/i.test(name)) {
+        if (!/crystal|fluid|urine/i.test(nameLower)) {
+          detected.uric.push(code);
+          details.uric.push({ code, name });
+        }
+      }
+
+      if (/^ldl(-c)?(\s*cholesterol)?$/i.test(name) || /direct\s*ldl/i.test(name) || /^ldl\s*-\s*chol/i.test(name)) {
+        detected.ldl.push(code);
+        details.ldl.push({ code, name });
+      }
+
+      if (/^hct$/i.test(name) || /^hematocrit$/i.test(name) || /^haematocrit$/i.test(name)) {
+        if (!/gas/i.test(nameLower)) {
+          detected.hct.push(code);
+          details.hct.push({ code, name });
+        }
+      }
+
+      if (/^platelet\s*count$/i.test(name) || /^plt\s*count$/i.test(name) || /^platelet$/i.test(name)) {
+        if (!/smear|conc|single\s*donor|rich/i.test(nameLower)) {
+          detected.platelet.push(code);
+          details.platelet.push({ code, name });
+        }
+      }
+
+      if (/^uacr$/i.test(name) || /urine\s*microalbumin/i.test(name) || /^microalbumin$/i.test(name) || /albumin.*creatinine\s*ratio/i.test(name)) {
+        detected.uacr.push(code);
+        details.uacr.push({ code, name });
+      }
+    });
+
+    res.json({ success: true, detected, details });
+  } catch (error) {
+    console.error('[setup] auto-detect-labs error:', error);
+    res.status(500).json({ success: false, error: 'ไม่สามารถตรวจจับรหัสแล็ปได้: ' + (error.message || error) });
+  }
+});
 
 app.get('/api/setup/status', localSetupOnly, (req, res) => {
   const config = db.getConfig();

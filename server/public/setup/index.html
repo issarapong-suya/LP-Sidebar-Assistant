@@ -179,7 +179,18 @@
             <div class="form-grid">
               <div class="field"><label for="searchCharset">Charset ชื่อผู้ป่วย</label><select id="searchCharset"><option value="tis620">TIS-620 / tis620_thai_ci</option><option value="utf8mb4">UTF-8 / utf8mb4</option></select><div class="field-help">เลือกตาม CHARACTER_SET_NAME ของ pname, fname และ lname</div></div>
               <div class="field"><label for="creatinineLabCode">รหัส Lab Creatinine</label><input id="creatinineLabCode" value="155" placeholder="เช่น 155"><div class="field-help">ใช้คำนวณ eGFR และ CrCl</div></div>
-              <div class="field full"><div class="mapping-card"><h3>รหัส Lab สำหรับดูแนวโน้ม</h3><p>ใส่ได้หลายรหัส คั่นด้วยจุลภาค เว้นว่างเพื่อค้นจากชื่อรายการ</p><div class="mapping-grid">
+              <div class="field full"><div class="mapping-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+                  <div>
+                    <h3 style="margin:0;">รหัส Lab สำหรับดูแนวโน้ม</h3>
+                    <p style="margin:3px 0 0 0;">ใส่ได้หลายรหัส คั่นด้วยจุลภาค หรือกดปุ่มตรวจจับเพื่อค้นหาอัตโนมัติจากฐาน HOSxP</p>
+                  </div>
+                  <button type="button" class="btn btn-secondary" id="btnAutoDetectLabs" style="font-size:12.5px; padding:6px 14px; background:#0f766e; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                    🪄 ค้นหาและจับคู่รหัส Lab อัตโนมัติ
+                  </button>
+                </div>
+                <div id="autoDetectSummary" style="display:none; margin-bottom:12px; padding:8px 12px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:6px; font-size:12px; color:#065f46;"></div>
+                <div class="mapping-grid">
                 <div class="field"><label for="labCodeK">Potassium (K)</label><input id="labCodeK" placeholder="เช่น 10, 11"></div>
                 <div class="field"><label for="labCodeNa">Sodium (Na)</label><input id="labCodeNa" placeholder="เช่น 12"></div>
                 <div class="field"><label for="labCodeBun">BUN</label><input id="labCodeBun" placeholder="เช่น 20"></div>
@@ -236,6 +247,44 @@ dbFields.forEach(id=>el(id).addEventListener('input',()=>{if(testedFingerprint){
 el('togglePassword').addEventListener('click',()=>{const input=el('dbPassword');input.type=input.type==='password'?'text':'password'});
 el('testButton').addEventListener('click',async()=>{const button=el('testButton');button.disabled=true;button.innerHTML='<span class="btn-icon">◌</span>กำลังตรวจสอบ...';showGrantDetails(null);try{if(!el('dbHost').value.trim()||!el('dbName').value.trim()||!el('dbUser').value.trim())throw new Error('กรอก Host, ชื่อฐานข้อมูล และบัญชีฐานข้อมูลให้ครบ');const data=await request('/api/setup/test-database');if(!data.readOnly)throw new Error('ระบบยืนยันสิทธิ์ SELECT-only ไม่ได้');testedFingerprint=fingerprint();el('nextFromDb').disabled=false;document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=false});el('testHint').textContent='เชื่อมต่อสำเร็จ · ขั้นตอนถัดไปพร้อมใช้งาน';setDbStatus(`เชื่อมต่อ ${data.database} สำเร็จ · account ที่ MariaDB จับคู่คือ ${data.identity?.authenticated_account||el('dbUser').value} · ยืนยัน SELECT-only แล้ว (สิทธิ์ SELECT ฐานอื่นยอมรับได้)`, 'success')}catch(error){testedFingerprint='';el('nextFromDb').disabled=true;setDbStatus(error.message,'error');showGrantDetails(error.data?.grantDetails)}finally{button.disabled=false;button.innerHTML='<span class="btn-icon">⌕</span>ทดสอบฐานข้อมูล'}});
 el('saveButton').addEventListener('click',async()=>{if(!testedFingerprint||fingerprint()!==testedFingerprint){setStatus('ฐานข้อมูลเปลี่ยนหลังทดสอบ กรุณากลับไปทดสอบใหม่ก่อนบันทึก','error');return}const button=el('saveButton');button.disabled=true;button.innerHTML='<span class="btn-icon">◌</span>กำลังบันทึก...';try{const data=await request('/api/setup/save');setStatus(data.message,'success');showProvision();el('saveHint').textContent='บันทึกการตั้งค่าเรียบร้อย';}catch(error){setStatus(error.message,'error')}finally{button.disabled=false;button.innerHTML='<span class="btn-icon">✓</span>บันทึกและเริ่มระบบ'}});
+el('btnAutoDetectLabs').addEventListener('click', async () => {
+  const btn = el('btnAutoDetectLabs');
+  const summaryBox = el('autoDetectSummary');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-icon">◌</span>กำลังค้นหาจาก lab_items...';
+  try {
+    const res = await fetch('/api/setup/auto-detect-labs');
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'ตรวจจับไม่สำเร็จ');
+    const d = data.detected;
+    if (d.creatinine && d.creatinine.length) el('creatinineLabCode').value = d.creatinine.join(', ');
+    if (d.potassium) el('labCodeK').value = d.potassium.join(', ');
+    if (d.sodium) el('labCodeNa').value = d.sodium.join(', ');
+    if (d.bun) el('labCodeBun').value = d.bun.join(', ');
+    if (d.ast) el('labCodeAst').value = d.ast.join(', ');
+    if (d.alt) el('labCodeAlt').value = d.alt.join(', ');
+    if (d.uric) el('labCodeUric').value = d.uric.join(', ');
+    if (d.ldl) el('labCodeLdl').value = d.ldl.join(', ');
+    if (d.hct) el('labCodeHct').value = d.hct.join(', ');
+    if (d.platelet) el('labCodePlatelet').value = d.platelet.join(', ');
+    if (d.uacr) el('labCodeUacr').value = d.uacr.join(', ');
+
+    summaryBox.style.display = 'block';
+    summaryBox.style.background = '#ecfdf5';
+    summaryBox.style.borderColor = '#6ee7b7';
+    summaryBox.style.color = '#065f46';
+    summaryBox.innerHTML = '✅ <b>ตรวจพบและเติมรหัสแล็ปเรียบร้อย:</b> Creatinine (' + (d.creatinine.join(',') || '-') + '), K (' + (d.potassium.join(',') || '-') + '), Na (' + (d.sodium.join(',') || '-') + '), BUN (' + (d.bun.join(',') || '-') + '), AST (' + (d.ast.join(',') || '-') + '), ALT (' + (d.alt.join(',') || '-') + '), Uric (' + (d.uric.join(',') || '-') + '), LDL (' + (d.ldl.join(',') || '-') + '), Hct (' + (d.hct.join(',') || '-') + '), Plt (' + (d.platelet.join(',') || '-') + '), UACR (' + (d.uacr.join(',') || '-') + ')';
+  } catch (err) {
+    summaryBox.style.display = 'block';
+    summaryBox.style.background = '#fef2f2';
+    summaryBox.style.borderColor = '#fca5a5';
+    summaryBox.style.color = '#991b1b';
+    summaryBox.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🪄 ค้นหาและจับคู่รหัส Lab อัตโนมัติ';
+  }
+});
 fetch('/api/setup/status').then(response=>response.json()).then(({config})=>{if(!config)return;el('hospitalName').value=config.hospitalName||'';el('hospitalCode').value=config.hospitalCode||'';el('serverPort').value=config.port||3030;el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||['127.0.0.1','::1']).join(',');el('dbHost').value=config.hosxp?.host||'';el('dbPort').value=config.hosxp?.port||3306;el('dbName').value=config.hosxp?.database||'';el('dbUser').value=config.hosxp?.user||'';el('passwordHelp').textContent='เว้นว่างไว้เพื่อคงรหัสผ่านเดิม';el('creatinineLabCode').value=config.schema?.creatinineLabCode||'155';el('searchCharset').value=config.schema?.searchCharset||'tis620';const codes=config.schema?.labTrendCodes||{};el('labCodeLdl').value=(codes.ldl||[]).join(', ');el('labCodeHct').value=(codes.hct||[]).join(', ');el('labCodePlatelet').value=(codes.platelet||[]).join(', ');el('labCodeUacr').value=(codes.uacr||[]).join(', ');el('labCodeK').value=(codes.potassium||[]).join(', ');el('labCodeNa').value=(codes.sodium||[]).join(', ');el('labCodeBun').value=(codes.bun||[]).join(', ');el('labCodeAst').value=(codes.ast||[]).join(', ');el('labCodeAlt').value=(codes.alt||[]).join(', ');el('labCodeUric').value=(codes.uric||[]).join(', ')}).catch(()=>{});
 </script>
 </body>

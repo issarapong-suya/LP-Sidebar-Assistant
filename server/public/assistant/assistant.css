@@ -2707,3 +2707,51 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
   font-size: 11px;
   color: #475569;
 }
+
+/* ─── Patient Chief Complaint (CC) Row Styling ─── */
+.patient-cc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.cc-badge {
+  color: #0f766e;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cc-val {
+  color: #334155;
+  word-break: break-word;
+}
+
+/* ─── Visit Dropdown Load More Button ─── */
+.visit-load-more-wrap {
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-top: 1px dashed #cbd5e1;
+  text-align: center;
+}
+.btn-load-more-visits {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #0f766e;
+  color: #0f766e;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-load-more-visits:hover {
+  background: #0f766e;
+  color: #ffffff;
+}
