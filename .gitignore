@@ -3,6 +3,7 @@ server/node_modules/
 server/config.json
 server/.env
 server/data/*.jsonl
+server/data/*.sqlite*
 server/npm-debug.log*
 
 # Workstation configuration and generated builds

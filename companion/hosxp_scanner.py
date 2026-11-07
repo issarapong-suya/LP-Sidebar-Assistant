@@ -8,6 +8,7 @@ import json
 import socket
 import threading
 import sys
+import time
 
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
@@ -265,11 +266,15 @@ RE_THAI_NAME = re.compile(r'((?:นาย|นางสาว|นาง|น\.ส\
 _CACHED_LOGIN_USER = None
 _CACHED_LOGIN_DEPT = None
 _CACHED_PID = None
+_CACHED_LOGIN_CHECK_AT = 0.0
 
 def extract_login_user_from_pid(pid):
     """ สแกนหาชื่อ User และแผนก ที่ใช้ล็อกอินเข้า HOSxP (BMS HOSxP) จาก Process Memory โดยตรง """
-    global _CACHED_LOGIN_USER, _CACHED_LOGIN_DEPT, _CACHED_PID
-    if _CACHED_PID == pid and _CACHED_LOGIN_USER:
+    global _CACHED_LOGIN_USER, _CACHED_LOGIN_DEPT, _CACHED_PID, _CACHED_LOGIN_CHECK_AT
+    # Recheck often enough to detect a user switch while the HOSxP process stays open.
+    # A short cache avoids rescanning all process memory on every 1.5s monitor tick.
+    now = time.monotonic()
+    if _CACHED_PID == pid and _CACHED_LOGIN_USER and now - _CACHED_LOGIN_CHECK_AT < 2.0:
         return _CACHED_LOGIN_USER
 
     hProcess = kernel32.OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, False, pid)
@@ -282,6 +287,8 @@ def extract_login_user_from_pid(pid):
     pat_out_time_utf16 = ',นอกเวลา'.encode('utf-16le')
     pat_in_time_cp874 = ',ในเวลา'.encode('cp874')
     pat_out_time_cp874 = ',นอกเวลา'.encode('cp874')
+    pat_leave_utf16 = tuple(value.encode('utf-16le') for value in (', ใบลา', ',ใบลา'))
+    pat_leave_cp874 = tuple(value.encode('cp874') for value in (', ใบลา', ',ใบลา'))
 
     addr = 0
     mbi = MEMORY_BASIC_INFORMATION()
@@ -327,7 +334,7 @@ def extract_login_user_from_pid(pid):
                         pass
 
                 # 3. Status Bar (UTF-16) รูปแบบ: ชื่อ (แผนก) : กลุ่มสิทธิ์ : user,ในเวลา
-                for pat in (pat_in_time_utf16, pat_out_time_utf16):
+                for pat in (pat_in_time_utf16, pat_out_time_utf16, *pat_leave_utf16):
                     idx = raw.find(pat)
                     if idx != -1:
                         chunk = raw[max(0, idx - 300):idx + len(pat)]
@@ -348,7 +355,7 @@ def extract_login_user_from_pid(pid):
                     break
 
                 # 4. Status Bar (CP874)
-                for pat in (pat_in_time_cp874, pat_out_time_cp874):
+                for pat in (pat_in_time_cp874, pat_out_time_cp874, *pat_leave_cp874):
                     idx = raw.find(pat)
                     if idx != -1:
                         chunk = raw[max(0, idx - 200):idx + len(pat)]
@@ -377,6 +384,7 @@ def extract_login_user_from_pid(pid):
         _CACHED_PID = pid
         _CACHED_LOGIN_USER = found_user
         _CACHED_LOGIN_DEPT = found_dept
+        _CACHED_LOGIN_CHECK_AT = time.monotonic()
     return found_user
 
 def get_hosxp_login_dept():
@@ -392,6 +400,17 @@ def extract_hosxp_user(texts):
         if not text:
             continue
         t = str(text).strip()
+        # HOSxP V3 status bar commonly shows:
+        # "ชื่อผู้ใช้ (แผนก): role : ชื่อผู้ใช้, ใบลา".
+        # Accept the visible status suffix (including ใบลา) instead of requiring
+        # only the older in-time/out-time markers used by the memory scanner.
+        status_match = re.search(
+            r'(?P<name>[\u0E01-\u0E5B]{2,}(?:\s+[\u0E01-\u0E5B]{2,})+)\s*'
+            r'\([^()\r\n]{1,80}\)\s*:\s*[^:,\r\n]{1,80}\s*:\s*[^,\r\n]{1,80}\s*,\s*[^,\r\n]{1,40}',
+            t
+        )
+        if status_match:
+            return status_match.group('name').strip()
         m2 = re.search(r'(?:ผู้ใช้งาน|Login|User|Staff)\s*[:=]\s*([^\r\n,]+)', t, re.IGNORECASE)
         if m2:
             val = m2.group(1).strip()
@@ -455,12 +474,11 @@ def get_hosxp_active_user():
             _CACHED_LOGIN_USER = u
             return u
 
-    # 3. หากรอบนี้ยังอ่าน Memory ไม่ทัน แต่ HOSxP ยังเปิดใช้งานอยู่ และมีชื่อเดิมที่แคชไว้ในเซสชันนี้
-    if _CACHED_LOGIN_USER:
-        return _CACHED_LOGIN_USER
-
-    # 4. Fallback กรณี HOSxP เปิดอยู่และล็อกอินแล้ว แต่ยังไม่สามารถแกะชื่อเฉพาะได้
-    return "บุคลากรทางการแพทย์ (HOSxP)"
+    # Fail closed: a running HOSxP process or a stale cached username is not proof
+    # that a named user is currently logged in. Do not activate patient APIs.
+    _CACHED_LOGIN_USER = None
+    _CACHED_PID = None
+    return None
 
 def get_hosxp_live_typing_text():
     """

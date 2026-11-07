@@ -10,6 +10,8 @@ from ctypes import wintypes
 import threading
 import webbrowser
 import subprocess
+import shutil
+import urllib.error
 import urllib.parse
 import urllib.request
 import numpy as np
@@ -27,9 +29,11 @@ else:
 
 CONFIG_FILE = os.path.join(EXE_DIR, "config.json")
 ICON_PATH = os.path.join(BASE_DIR, "doctor_icon.png")
+INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SidebarDoctorAssistant")
+INSTALLED_EXE = os.path.join(INSTALL_DIR, "DoctorAssistantCompanion.exe")
 
-COMPANION_VERSION = "1.0.0-assistant"
-COMPANION_BUILD = "20261106.01"
+COMPANION_VERSION = "1"
+COMPANION_BUILD = "20261107.06"
 
 # ค่าเริ่มต้น (ไม่เก็บรหัสผ่านเป็น plain text ใน config.json เพื่อความปลอดภัยสูงสุด)
 DEFAULT_CONFIG = {
@@ -41,7 +45,144 @@ DEFAULT_CONFIG = {
     "widget_x": -1,
     "widget_y": -1,
     "companion_version": COMPANION_VERSION,
+    "companion_build": COMPANION_BUILD,
+    "companion_token": "",
 }
+
+def server_url_from_download(exe_path=None):
+    """Read the originating server URL from Windows' download zone metadata."""
+    exe_path = exe_path or sys.executable
+    try:
+        with open(f"{exe_path}:Zone.Identifier", "r", encoding="utf-8", errors="ignore") as stream:
+            for line in stream:
+                key, _, value = line.partition("=")
+                if key.strip().lower() not in ("hosturl", "referrerurl"):
+                    continue
+                parsed = urllib.parse.urlparse(value.strip())
+                if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
+                    continue
+                return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", "")).rstrip("/")
+    except (OSError, ValueError):
+        pass
+    return ""
+
+def enrollment_ticket_from_download(exe_path=None):
+    """Read the one-time install ticket embedded in the download request URL."""
+    exe_path = exe_path or sys.executable
+    try:
+        with open(f"{exe_path}:Zone.Identifier", "r", encoding="utf-8", errors="ignore") as stream:
+            for line in stream:
+                key, _, value = line.partition("=")
+                if key.strip().lower() not in ("hosturl", "referrerurl"):
+                    continue
+                parsed = urllib.parse.urlparse(value.strip())
+                ticket = urllib.parse.parse_qs(parsed.query).get("ticket", [""])[0]
+                if len(ticket) == 32 and all(ch in "0123456789abcdefABCDEF" for ch in ticket):
+                    return ticket.lower()
+    except (OSError, ValueError):
+        pass
+    return ""
+
+def get_windows_special_folder(csidl):
+    """ ค้นหาโฟลเดอร์ระบบของ Windows (เช่น Desktop จริง แม้จะถูก Redirect ไป OneDrive) """
+    try:
+        buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        ctypes.windll.shell32.SHGetFolderPathW(None, csidl, None, 0, buf)
+        return buf.value
+    except Exception:
+        return ""
+
+def ensure_shortcuts(target_exe):
+    """สร้างทางลัดบน Desktop และ Startup folder ของ Windows เพื่อให้เปิดอัตโนมัติเมื่อเปิดเครื่อง"""
+    try:
+        work_dir = os.path.dirname(target_exe)
+        desktop_dir = get_windows_special_folder(0) or os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop")
+        startup_dir = get_windows_special_folder(7) or os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+        
+        shortcuts = [
+            os.path.join(desktop_dir, "Doctor Assistant.lnk"),
+            os.path.join(startup_dir, "Doctor Assistant.lnk")
+        ]
+        
+        CREATE_NO_WINDOW = 0x08000000
+        for lnk in shortcuts:
+            try:
+                target_dir = os.path.dirname(lnk)
+                if not os.path.exists(target_dir):
+                    continue
+                ps_cmd = (
+                    f"$ws = New-Object -ComObject WScript.Shell; "
+                    f"$s = $ws.CreateShortcut('{lnk}'); "
+                    f"$s.TargetPath = '{target_exe}'; "
+                    f"$s.WorkingDirectory = '{work_dir}'; "
+                    f"$s.Description = 'Sidebar Doctor Assistant Companion'; "
+                    f"$s.Save()"
+                )
+                subprocess.run(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
+                               capture_output=True, timeout=8, creationflags=CREATE_NO_WINDOW)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[Companion] Shortcut creation notice: {e}")
+
+def install_companion_copy():
+    """Move the downloaded single-file app into the current user's app folder and configure it."""
+    if not getattr(sys, "frozen", False):
+        return True
+    try:
+        source = os.path.abspath(sys.executable)
+        destination = os.path.abspath(INSTALLED_EXE)
+        if os.path.normcase(source) == os.path.normcase(destination):
+            ensure_shortcuts(destination)
+            return True
+
+        # ปิดกระบวนการ Companion เดิมที่กำลังเปิดอยู่ เพื่อปลดล็อกไฟล์ก่อนอัปเดต
+        ensure_single_instance_restart()
+        time.sleep(0.3)
+
+        os.makedirs(INSTALL_DIR, exist_ok=True)
+        destination_config = os.path.join(INSTALL_DIR, "config.json")
+        new_server = server_url_from_download(source)
+        new_ticket = enrollment_ticket_from_download(source)
+
+        if os.path.exists(destination_config):
+            try:
+                with open(destination_config, "r", encoding="utf-8") as stream:
+                    cfg = json.load(stream)
+            except Exception:
+                cfg = DEFAULT_CONFIG.copy()
+            if new_server:
+                cfg["server_url"] = new_server
+            if new_ticket:
+                cfg["install_ticket"] = new_ticket
+                cfg["companion_token"] = ""
+            with open(destination_config, "w", encoding="utf-8") as stream:
+                json.dump(cfg, stream, indent=2, ensure_ascii=False)
+        else:
+            if os.path.isfile(CONFIG_FILE):
+                shutil.copy2(CONFIG_FILE, destination_config)
+            else:
+                initial_config = DEFAULT_CONFIG.copy()
+                initial_config["server_url"] = new_server or initial_config["server_url"]
+                initial_config["install_ticket"] = new_ticket
+                with open(destination_config, "w", encoding="utf-8") as stream:
+                    json.dump(initial_config, stream, indent=2, ensure_ascii=False)
+
+        temp_exe = destination + ".new"
+        shutil.copy2(source, temp_exe)
+        try:
+            os.replace(temp_exe, destination)
+        except PermissionError:
+            ensure_single_instance_restart()
+            time.sleep(0.6)
+            os.replace(temp_exe, destination)
+
+        ensure_shortcuts(destination)
+        subprocess.Popen([destination], cwd=INSTALL_DIR, close_fds=True, creationflags=0x08000000)
+        return False
+    except Exception as error:
+        print(f"[Companion] Could not install to user profile: {type(error).__name__} ({error})")
+        return True
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -298,13 +439,15 @@ def launch_browser_on_desktop(url, app_mode=True, monitor_bounds=None, maximize=
         pos_args = ""
 
     max_arg = " --start-maximized" if maximize else ""
+    # The Sidebar must be able to sound patient-change/alert tones without a prior page click.
+    autoplay_arg = " --autoplay-policy=no-user-gesture-required"
     sw_mode = 3 if maximize else 1  # 3 = SW_SHOWMAXIMIZED, 1 = SW_SHOWNORMAL
 
     if browser_exe and os.path.isfile(browser_exe):
         if app_mode:
-            cmd_line = f'"{browser_exe}" --user-data-dir="{profile_dir}" --app="{url}"{max_arg}{pos_args}'
+            cmd_line = f'"{browser_exe}" --user-data-dir="{profile_dir}"{autoplay_arg} --app="{url}"{max_arg}{pos_args}'
         else:
-            cmd_line = f'"{browser_exe}" --user-data-dir="{profile_dir}"{max_arg}{pos_args} "{url}"'
+            cmd_line = f'"{browser_exe}" --user-data-dir="{profile_dir}"{autoplay_arg}{max_arg}{pos_args} "{url}"'
 
         si = STARTUPINFOW()
         si.cb = ctypes.sizeof(STARTUPINFOW)
@@ -522,7 +665,7 @@ def ensure_single_instance_restart():
                 pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
                 if kernel32.Process32FirstW(hSnapshot, ctypes.byref(pe)):
                     while True:
-                        if pe.szExeFile.lower() == exe_name and pe.th32ProcessID not in my_pids:
+                        if (pe.szExeFile.lower() == exe_name or 'doctorassistantcompanion' in pe.szExeFile.lower()) and pe.th32ProcessID not in my_pids:
                             hProc = kernel32.OpenProcess(0x0001, False, pe.th32ProcessID)
                             if hProc:
                                 kernel32.TerminateProcess(hProc, 0)
@@ -551,6 +694,10 @@ class FloatingDoctorApp:
 
         # สร้างหน้าต่าง Layered Window
         self.create_layered_window()
+
+        # ลงทะเบียน token ประจำเครื่องโดยอัตโนมัติเมื่อเป็นการติดตั้งครั้งแรก
+        self.enrollment_thread = threading.Thread(target=self.register_with_server, daemon=True)
+        self.enrollment_thread.start()
 
         # เริ่มต้น Thread ตรึง Always-on-Top ลอยอยู่เหนือทุกโปรแกรมตลอดเวลา
         self.topmost_thread = threading.Thread(target=self.always_on_top_worker, daemon=True)
@@ -794,7 +941,7 @@ class FloatingDoctorApp:
             if not hMenu:
                 return
 
-            user32.AppendMenuW(hMenu, MF_STRING | 0x00000001, 999, f"📌 OPD Companion v{COMPANION_VERSION}") # MF_GRAYED
+            user32.AppendMenuW(hMenu, MF_STRING | 0x00000001, 999, f"📌 OPD Companion v{COMPANION_VERSION} · {COMPANION_BUILD}") # MF_GRAYED
             user32.AppendMenuW(hMenu, MF_SEPARATOR, 0, "")
 
             user32.AppendMenuW(hMenu, MF_STRING, 111, "🩺 เปิดผู้ช่วยแพทย์ (Sidebar Doctor Assistant) [ค่าเริ่มต้น]")
@@ -878,6 +1025,9 @@ class FloatingDoctorApp:
                 "vn": vn,
                 "hn": hn,
                 "user": user,
+                "session_active": bool(user and user.strip()),
+                "companion_version": COMPANION_VERSION,
+                "companion_build": COMPANION_BUILD,
                 "trigger": trigger
             }
             if click_id:
@@ -886,11 +1036,79 @@ class FloatingDoctorApp:
             req = urllib.request.Request(
                 f"{server_url}/api/notify-patient",
                 data=data,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json", "X-Companion-Token": self.config.get("companion_token", "")}
             )
-            urllib.request.urlopen(req, timeout=1.0)
-        except Exception:
-            pass
+            with urllib.request.urlopen(req, timeout=1.0) as response:
+                if response.status != 200:
+                    print(f"[Companion] Heartbeat was not accepted: HTTP {response.status}")
+        except urllib.error.HTTPError as error:
+            print(f"[Companion] Heartbeat was rejected: HTTP {error.code}")
+        except Exception as error:
+            print(f"[Companion] Heartbeat could not reach server: {type(error).__name__}")
+
+    def needs_device_enrollment(self):
+        tok = str(self.config.get("companion_token", "")).strip()
+        # หากไม่มี token หรือเป็น token เก่าระดับ shared ให้ลงทะเบียนเพื่อรับ token เฉพาะเครื่อง
+        return not tok or tok == "60d1dfc3f900dfe319dd04363883f91f5c3d1fb7a1b080047e5437c061b2fdf0"
+
+    def register_with_server(self):
+        """Enroll this workstation without asking the user to copy an activation code."""
+        while self.running and self.needs_device_enrollment():
+            try:
+                server_url = str(self.config.get("server_url", "")).rstrip("/")
+                if not server_url:
+                    time.sleep(5)
+                    continue
+
+                ticket = str(self.config.get("install_ticket", "")).strip()
+                # กรณี localhost หากไม่มี ticket ให้ขอ ticket อัตโนมัติเพื่อความสะดวกในการทดสอบ
+                if not ticket and ("localhost" in server_url or "127.0.0.1" in server_url):
+                    try:
+                        req_t = urllib.request.Request(
+                            f"{server_url}/api/install/ticket",
+                            data=b"{}",
+                            headers={"Content-Type": "application/json", "User-Agent": "SidebarDoctorAssistantCompanion/1"},
+                            method="POST",
+                        )
+                        with urllib.request.urlopen(req_t, timeout=5) as r_t:
+                            t_data = json.loads(r_t.read().decode("utf-8"))
+                            if t_data.get("success") and t_data.get("ticket"):
+                                ticket = t_data["ticket"]
+                                self.config["install_ticket"] = ticket
+                                save_config(self.config)
+                    except Exception as ex:
+                        print(f"[Companion] Auto-ticket request error: {ex}")
+
+                if not ticket:
+                    time.sleep(10)
+                    continue
+
+                payload = json.dumps({
+                    "ticket": ticket,
+                    "deviceName": socket.gethostname() or os.environ.get("COMPUTERNAME", "HOSxP workstation")
+                }).encode("utf-8")
+                request = urllib.request.Request(
+                    f"{server_url}/api/install/enroll",
+                    data=payload,
+                    headers={"Content-Type": "application/json", "User-Agent": "SidebarDoctorAssistantCompanion/1"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                token = str(result.get("token") or "")
+                if result.get("success") and len(token) == 64:
+                    self.config["companion_token"] = token
+                    self.config.pop("install_ticket", None)
+                    save_config(self.config)
+                    print(f"[Companion v{COMPANION_VERSION}] Workstation registered with Sidebar server")
+                    return
+                raise ValueError("Server did not return a device credential")
+            except urllib.error.HTTPError as error:
+                print(f"[Companion] Workstation enrollment rejected: HTTP {error.code}")
+                time.sleep(15)
+            except Exception as error:
+                print(f"[Companion] Workstation enrollment unavailable: {type(error).__name__}")
+                time.sleep(15)
 
     def ensure_server_running(self):
         """ ตรวจสอบและเปิด Server อัตโนมัติหากยังไม่ได้เปิด (กรณี localhost) """
@@ -932,18 +1150,11 @@ class FloatingDoctorApp:
             self.ensure_server_running()
             server_url = self.config.get("server_url", "http://localhost:3030")
             patient = scan_hosxp_patient(server_url)
-            comp_name = socket.gethostname() or os.environ.get("COMPUTERNAME", "Client-PC")
-            lan_ip = get_local_lan_ip()
-            client_params = f"computer={urllib.parse.quote(comp_name)}&ip={urllib.parse.quote(lan_ip)}"
-
             hosxp_user = ""
             if patient and patient.get("user"):
                 hosxp_user = patient.get("user")
             else:
                 hosxp_user = get_hosxp_active_user() or ""
-
-            if hosxp_user:
-                client_params += f"&user={urllib.parse.quote(hosxp_user)}&source=hosxp"
 
             vn = patient.get("vn") if patient else None
             hn = patient.get("hn", "") if patient else ""
@@ -959,9 +1170,9 @@ class FloatingDoctorApp:
                 "height": screen_h - 40
             }
 
-            assistant_url = f"{server_url}/assistant/?{client_params}"
+            # Keep workstation identity and patient identifiers out of the browser URL/history.
+            assistant_url = f"{server_url}/assistant/"
             if vn:
-                assistant_url = f"{server_url}/assistant/?vn={vn}&{client_params}"
                 self.notify_server_patient(vn, hn, user=hosxp_user, trigger="click")
 
             if focus_existing_assistant(bounds):
@@ -1091,8 +1302,8 @@ if ($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
     Write-Output $txt.Text
 }}
 """
-            cmd = ["powershell", "-NoProfile", "-Command", script]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            cmd = ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, creationflags=0x08000000)
             return res.stdout.strip()
         except Exception as e:
             print("native_input_box error:", e)
@@ -1146,14 +1357,15 @@ $form.Add_Shown({{$form.Activate(); $form.BringToFront(); $btnOk.Focus()}})
 
 $form.ShowDialog()
 """
-            cmd = ["powershell", "-NoProfile", "-Command", script]
-            subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            cmd = ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=30, creationflags=0x08000000)
         except Exception:
             pass
 
     def auto_view_worker(self):
         """ ตรวจจับสถานะล็อกอิน, การเปลี่ยนผู้ใช้ และคนไข้ใหม่ใน HOSxP ในพื้นหลังแบบ Real-time """
         last_heartbeat = 0
+        detection_state = None
         while self.running:
             time.sleep(1.5)
 
@@ -1161,6 +1373,10 @@ $form.ShowDialog()
                 server_url = self.config.get("server_url", "http://localhost:3030")
                 curr_user = get_hosxp_active_user() or ""
                 now = time.time()
+                current_detection_state = bool(curr_user)
+                if current_detection_state != detection_state:
+                    print("[Companion] HOSxP session detected." if current_detection_state else "[Companion] No verified HOSxP session; waiting.")
+                    detection_state = current_detection_state
 
                 # ตรวจจับการเปลี่ยนแปลงผู้ใช้งาน HOSxP (เช่น ปิดโปรแกรม HOSxP จน curr_user กลายเป็นว่าง หรือสลับชื่อหมอคนใหม่)
                 prev_user = getattr(self, "last_user", None)
@@ -1193,8 +1409,8 @@ $form.ShowDialog()
                             focus_existing_assistant()
                         except Exception:
                             pass
-            except Exception as e:
-                pass
+            except Exception as error:
+                print(f"[Companion] HOSxP monitor error: {type(error).__name__}")
 
     def run(self):
         msg = MSG()
@@ -1206,6 +1422,8 @@ $form.ShowDialog()
             user32.DispatchMessageW(ctypes.byref(msg))
 
 if __name__ == '__main__':
+    if not install_companion_copy():
+        sys.exit(0)
     ensure_default_desktop()
     # ป้องกันการเปิดโปรแกรมซ้ำซ้อน หากเปิดซ้ำให้รีสตาร์ตปิดตัวเก่าแล้วรันตัวใหม่ทันที
     ensure_single_instance_restart()

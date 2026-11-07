@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d766d">
+  <title>ประวัติการใช้งาน · Sidebar Doctor Assistant</title>
+  <link rel="icon" type="image/png" href="/doctor-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fonts/prompt.css">
+    <style>
+    :root{font-family:Prompt,"Segoe UI",Tahoma,sans-serif;color:#173247;background:#f3f7fa;font-synthesis:none;text-rendering:optimizeLegibility;--green:#08796e;--muted:#64748b;--line:#e2eaf0;--surface:#fff}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;min-height:100vh;background:radial-gradient(ellipse at 95% 0%,#dff3ee 0,transparent 32%),#f3f7fa}button,input,select{font:inherit}button,a{cursor:pointer}
+    .topbar{height:76px;background:#fff;border-bottom:1px solid #e6edf2;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,4vw,64px);position:sticky;top:0;z-index:5}
+    .brand{display:flex;align-items:center;gap:13px}
+    .brand-logo{width:46px;height:46px;border-radius:12px;object-fit:contain;box-shadow:0 4px 12px rgba(8,121,110,0.2);flex-shrink:0}
+    .brand-title{font-size:18px;font-weight:800;line-height:1.3;color:#0f2738}
+    .brand-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+    .top-actions{display:flex;align-items:center;gap:12px}
+    .back-link{border:1px solid #dce8ed;border-radius:10px;background:#fff;color:#31566b;text-decoration:none;padding:9px 15px;font-size:13px;font-weight:650;transition:all .15s}
+    .back-link:hover{background:#f3faf8;border-color:#a6d3cb}
+    .build-chip{border:1px solid #d7e8e7;background:#f2fbf8;color:#39756e;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:650;white-space:nowrap}
+    main{width:min(1560px,100%);margin:auto;padding:24px clamp(16px,3.5vw,54px) 42px}
+    .welcome{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:4px 4px 16px}
+    .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#69899a;font-weight:700}
+    .welcome h1{font-size:clamp(24px,2.5vw,32px);letter-spacing:-.03em;margin:5px 0;font-weight:800;color:#0f2738}
+    .welcome p{margin:0;color:var(--muted);font-size:14px}
+    .server-only{border:1px solid #e4eaf0;background:#fff;border-radius:12px;padding:12px 16px;color:#61778b;font-size:12.5px;white-space:nowrap}
+    .server-only b{color:#0a796e}
+    .panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 32px #23415b0b;overflow:hidden}
+    .panel-head{padding:20px 26px;border-bottom:1px solid #edf1f4;display:flex;justify-content:space-between;gap:16px;align-items:center}
+    .panel-head h2{font-size:18px;font-weight:800;margin:0;color:#0f2738}
+    .panel-head p{font-size:13px;color:var(--muted);margin:3px 0 0}
+    .source-summary{color:#4e7380;font-size:12.5px;text-align:right}
+    .filters{padding:18px 26px;border-bottom:1px solid #edf1f4;display:grid;grid-template-columns:repeat(5,minmax(130px,1fr)) auto;gap:14px;align-items:end}
+    .field label{display:block;font-size:12.5px;font-weight:700;color:#475569;margin-bottom:6px}
+    .field input,.field select{width:100%;height:42px;border:1px solid #dce5eb;border-radius:10px;background:white;padding:0 12px;color:#203b4f;font-size:13.5px;outline:none}
+    .field input:focus,.field select:focus{border-color:#5fafa2;box-shadow:0 0 0 3px #238b7b18}
+    .filter-actions{display:flex;gap:8px}
+    .btn{height:42px;border-radius:10px;padding:0 18px;font-size:13.5px;font-weight:700}
+    .btn-primary{border:1px solid #08796e;background:#08796e;color:white}
+    .btn-light{border:1px solid #dce5eb;background:#fff;color:#446276}
+    .notice{display:flex;gap:12px;margin:16px 26px 0;padding:12px 16px;border:1px solid #dbeaf2;border-radius:11px;background:#f3f9fc;color:#5d7484;font-size:12.5px;line-height:1.65}
+    .notice.warning{border-color:#f0dfb1;background:#fff9e9;color:#746332}
+    .table-wrap{overflow:auto;padding:14px 20px 4px}
+    table{width:100%;border-collapse:separate;border-spacing:0;min-width:960px}
+    th{text-align:left;padding:11px 12px;color:#64748b;background:#f7fafb;border-bottom:1px solid #e8eef2;font-size:12px;font-weight:750;white-space:nowrap}
+    td{padding:11px 12px;border-bottom:1px solid #eef2f5;font-size:12.5px;color:#314c60;vertical-align:middle}
+    tbody tr:hover{background:#fbfdfd}
+    .time{white-space:nowrap;color:#64748b;font-size:12px}
+    .action{display:inline-flex;border-radius:8px;background:#edf7f4;color:#17695f;padding:4px 8px;font-size:11.5px;font-weight:700;white-space:nowrap}
+    .source{display:inline-flex;border-radius:999px;padding:4px 9px;background:#f1f4f7;color:#65788a;font-size:11px;font-weight:600;white-space:nowrap}
+    .source.jsonl{background:#fff4dd;color:#936b20}
+    .result{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px}
+    .result:before{content:"";width:7px;height:7px;border-radius:50%;background:#29a476}
+    .result.denied:before,.result.error:before{background:#dc625a}
+    .resource-ref{font-family:Consolas,monospace;color:#64748b;font-size:11.5px}
+    .empty{padding:42px 16px;text-align:center;color:#8a9aaa;font-size:14px}
+    .table-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 26px 20px;color:#64748b;font-size:13px}
+    .pager{display:flex;align-items:center;gap:10px}
+    .pager button{height:36px;padding:0 14px;border:1px solid #dce5eb;border-radius:9px;background:#fff;color:#3b596d;font-size:12.5px;font-weight:600}
+    .pager button:disabled{opacity:.45;cursor:not-allowed}
+    .footnote{margin:16px 6px;color:#8b9aa8;font-size:12px;display:flex;justify-content:space-between;gap:12px}
+    @media(max-width:1050px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.filter-actions{grid-column:1/-1}.filter-actions .btn{flex:1}}
+    @media(max-width:680px){.topbar{height:auto;min-height:68px;padding:12px 16px;gap:10px}.brand-logo{width:38px;height:38px}.brand-title{font-size:15px}.brand-sub{font-size:11px}.top-actions{gap:6px}.back-link{padding:8px 10px;font-size:11px}.build-chip{display:none}main{padding:18px 12px 30px}.welcome{align-items:flex-start;flex-direction:column}.server-only{white-space:normal}.panel-head{padding:16px;align-items:flex-start;flex-direction:column}.source-summary{text-align:left}.filters{padding:14px 16px;grid-template-columns:1fr 1fr;gap:10px}.field.search-field{grid-column:1/-1}.notice{margin:12px 16px 0}.table-wrap{padding:8px 6px 2px}.table-foot{padding:12px 16px;align-items:flex-start;flex-direction:column}.footnote{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="/doctor-icon.png" class="brand-logo" alt="Doctor Assistant Logo"><div><div class="brand-title">Sidebar Doctor Assistant</div><div class="brand-sub">Audit Log · บันทึกการใช้งานระบบ</div></div></div>
+    <div class="top-actions"><a class="back-link" href="/setup/">← กลับหน้าตั้งค่า</a><div class="build-chip" id="build">PRODUCT v1</div></div>
+  </header>
+  <main>
+    <section class="welcome"><div><div class="eyebrow">SYSTEM ACTIVITY</div><h1>ประวัติการใช้งาน</h1><p>ตรวจสอบเหตุการณ์ที่บันทึกไว้ในระบบ โดยไม่แสดง HN/VN จริง</p></div><div class="server-only">🔒 <b>เปิดได้จากเครื่อง Server</b><br>ข้อจำกัดการเข้าถึงเหมือนหน้า Setup</div></section>
+    <section class="panel" aria-label="Audit log">
+      <div class="panel-head"><div><h2>รายการเหตุการณ์</h2><p id="summary">กำลังโหลดประวัติ...</p></div><div class="source-summary" id="sourceSummary"></div></div>
+      <div class="filters">
+        <div class="field"><label for="from">ตั้งแต่วันที่</label><input id="from" type="date"></div>
+        <div class="field"><label for="to">ถึงวันที่</label><input id="to" type="date"></div>
+        <div class="field"><label for="action">ประเภทเหตุการณ์</label><select id="action"><option value="">ทั้งหมด</option><option>ASSISTANT_SEARCH</option><option>ASSISTANT_VISIT</option><option>COMPANION_HEARTBEAT_REJECTED</option><option>PATIENT_CONTEXT_SELECTED</option><option>PATIENT_CONTEXT_CLEARED</option><option>PATIENT_VITALS_HISTORY</option><option>PATIENT_LAB_HISTORY</option><option>PATIENT_VISIT_HISTORY</option><option>HOSXP_MANUAL_LOGIN</option><option>HOSXP_MANUAL_LOGIN_FAILED</option><option>HOSXP_MANUAL_LOGIN_ERROR</option><option>HOSXP_MANUAL_LOGIN_RATE_LIMITED</option><option>HOSXP_MANUAL_LOGOUT</option><option>HOSXP_MANUAL_SESSION_REPLACED_BY_COMPANION</option><option>HOSXP_SESSION_STARTED</option><option>HOSXP_SESSION_ENDED</option><option>API_ACCESS_DENIED</option><option>API_SESSION_REQUIRED</option><option>SETUP_INITIALIZED</option><option>SETUP_UPDATED</option><option>SETUP_UPDATE</option></select></div>
+        <div class="field"><label for="outcome">ผลลัพธ์</label><select id="outcome"><option value="">ทั้งหมด</option><option value="success">สำเร็จ</option><option value="denied">ปฏิเสธ</option><option value="error">ผิดพลาด</option></select></div>
+        <div class="field search-field"><label for="q">ค้นหาผู้ใช้ / เครื่อง / IP</label><input id="q" type="search" maxlength="120" placeholder="พิมพ์คำค้น"></div>
+        <div class="filter-actions"><button class="btn btn-primary" id="apply">ค้นหา</button><button class="btn btn-light" id="reset">ล้าง</button></div>
+      </div>
+      <div class="notice" id="privacyNotice">รายการผู้ป่วยอ้างอิงด้วยรหัส HMAC แทน HN/VN ส่วนชื่อผู้ใช้ เครื่อง และ IP แสดงตามข้อมูล Audit Log</div>
+      <div class="table-wrap"><table><thead><tr><th>วันเวลา (ไทย)</th><th>เหตุการณ์</th><th>ผู้ใช้</th><th>เครื่อง / IP</th><th>ข้อมูลอ้างอิง</th><th>ผล</th><th>แหล่ง</th></tr></thead><tbody id="rows"></tbody></table><div class="empty" id="empty" hidden>ไม่พบเหตุการณ์ตามเงื่อนไข</div></div>
+      <div class="table-foot"><div id="count">—</div><div class="pager"><button id="prev">ก่อนหน้า</button><span id="page">หน้า 1</span><button id="next">ถัดไป</button></div></div>
+    </section>
+    <div class="footnote"><span>เปิดได้เฉพาะจากเครื่อง Server ผ่าน localhost</span><span>การอ้างอิงผู้ป่วยใน log ถูกทำเป็น HMAC pseudonym</span></div>
+  </main>
+  <script>
+    const limit=50;let offset=0;const el=id=>document.getElementById(id);const text=(parent,value)=>{const node=document.createElement('span');node.textContent=value||'—';parent.append(node);return node};
+    function params(){const p=new URLSearchParams({limit:String(limit),offset:String(offset)});for(const id of ['from','to','action','outcome','q'])if(el(id).value.trim())p.set(id,el(id).value.trim());return p}
+    function displayTime(value){const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString('th-TH',{timeZone:'Asia/Bangkok',hour12:false})}
+    function cell(row,value,className){const td=document.createElement('td');if(className)td.className=className;text(td,value);row.append(td);return td}
+    async function load(){el('rows').replaceChildren();el('empty').hidden=true;el('summary').textContent='กำลังโหลดประวัติ...';el('apply').disabled=true;try{const response=await fetch(`/api/setup/audit?${params()}`,{cache:'no-store'});const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'อ่านประวัติไม่สำเร็จ');el('build').textContent=`PRODUCT v${data.productVersion} · BUILD ${data.build}`;el('summary').textContent=`พบ ${Number(data.total).toLocaleString('th-TH')} เหตุการณ์ตามเงื่อนไข`;el('sourceSummary').textContent=`SQLite ${Number(data.sources.sqlite).toLocaleString('th-TH')} · JSONL ${Number(data.sources.jsonl).toLocaleString('th-TH')}`;if(!data.sources.sqliteAvailable||data.sources.jsonlTruncated||data.sources.sqliteTruncated||data.sources.jsonl){el('privacyNotice').classList.add('warning');el('privacyNotice').textContent=data.sources.jsonl?'มีรายการบันทึกจาก JSONL fallback โปรดเก็บไฟล์สำรองไว้จนกว่าจะตรวจสอบและสำรองประวัติเรียบร้อย':'บางแหล่งข้อมูลอ่านไม่ได้หรือมีรายการมากกว่าขอบเขตที่แสดง โปรดตรวจสถานะไฟล์ audit และสำรองข้อมูลก่อนดำเนินการ';}for(const item of data.events){const tr=document.createElement('tr');cell(tr,displayTime(item.at),'time');const action=cell(tr,'');const badge=document.createElement('span');badge.className='action';badge.textContent=item.action||'—';action.append(badge);cell(tr,item.actor);const host=cell(tr,'');text(host,item.workstation);host.append(document.createElement('br'));const ip=document.createElement('small');ip.className='time';ip.textContent=item.client_ip||'—';host.append(ip);const ref=cell(tr,'');const kind=item.resource_type||'—';const code=String(item.resource_ref||'');text(ref,code?`${kind} · ${code.slice(0,10)}`:kind);ref.classList.add('resource-ref');const result=cell(tr,'');const resultText=document.createElement('span');resultText.className=`result ${item.outcome==='denied'||item.outcome==='error'?item.outcome:''}`;resultText.textContent=item.outcome==='success'?'สำเร็จ':item.outcome==='denied'?'ปฏิเสธ':item.outcome==='error'?'ผิดพลาด':item.outcome||'—';result.append(resultText);const src=cell(tr,'');const source=document.createElement('span');source.className=`source ${item.source==='jsonl'?'jsonl':''}`;source.textContent=item.source==='jsonl'?'JSONL':'SQLite';src.append(source);el('rows').append(tr)}el('empty').hidden=Boolean(data.events.length);el('count').textContent=`แสดง ${data.events.length?offset+1:0}–${Math.min(offset+data.events.length,data.total)} จาก ${Number(data.total).toLocaleString('th-TH')} รายการ`;el('page').textContent=`หน้า ${Math.floor(offset/limit)+1}`;el('prev').disabled=offset===0;el('next').disabled=offset+limit>=data.total;}catch(error){el('summary').textContent=error.message;el('privacyNotice').classList.add('warning');el('privacyNotice').textContent='ไม่สามารถอ่านประวัติได้ ตรวจสอบว่ากำลังเปิดจาก localhost ของเครื่อง Server';el('empty').hidden=false;el('prev').disabled=true;el('next').disabled=true;}finally{el('apply').disabled=false}}
+    el('apply').addEventListener('click',()=>{offset=0;load()});el('reset').addEventListener('click',()=>{for(const id of ['from','to','action','outcome','q'])el(id).value='';offset=0;load()});el('q').addEventListener('keydown',event=>{if(event.key==='Enter'){offset=0;load()}});el('prev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);load()});el('next').addEventListener('click',()=>{offset+=limit;load()});load();
+  </script>
+</body>
+</html>

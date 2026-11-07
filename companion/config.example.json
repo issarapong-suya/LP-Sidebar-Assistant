@@ -1,5 +1,8 @@
 {
   "server_url": "http://192.168.1.10:3030",
+  "companion_token": "",
+  "companion_version": "1",
+  "companion_build": "20261107.03",
   "auto_view": true,
   "open_new_tab": false,
   "always_on_top": true,

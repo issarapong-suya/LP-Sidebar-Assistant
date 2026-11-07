@@ -16,6 +16,12 @@
   },
   "schema": {
     "searchCharset": "tis620",
-    "creatinineLabCode": "155"
+    "creatinineLabCode": "155",
+    "labTrendCodes": {
+      "ldl": [],
+      "hct": [],
+      "platelet": [],
+      "uacr": []
+    }
   }
 }

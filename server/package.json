@@ -1,6 +1,7 @@
 {
   "name": "doctor-assistant-server",
   "version": "1.0.0",
+  "engines": { "node": ">=22.5.0" },
   "private": true,
   "description": "Standalone Sidebar Doctor Assistant server for hospital HOSxP deployments",
   "main": "server.js",

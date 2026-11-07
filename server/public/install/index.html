@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d766d">
+  <title>ติดตั้ง Companion · Sidebar Doctor Assistant</title>
+  <link rel="icon" type="image/png" href="/doctor-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fonts/prompt.css">
+  <style>
+    :root {
+      font-family: Prompt, "Segoe UI", Tahoma, sans-serif;
+      color: #173247;
+      background: #f3f7fa;
+      --teal: #08796e;
+      --teal-dark: #065b53;
+      --teal-light: #e7f5f1;
+      --muted: #64748b;
+      --line: #e2eaf0;
+      --success: #10b981;
+      --success-light: #ecfdf5;
+      --amber: #f59e0b;
+      --amber-light: #fffbeb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 95% 0%, #dff3ee 0, transparent 38%), #f3f7fa;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      height: 64px;
+      background: #fff;
+      border-bottom: 1px solid #e6edf2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 clamp(16px, 3vw, 40px);
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f2738;
+    }
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      object-fit: contain;
+      box-shadow: 0 4px 12px rgba(8, 121, 110, 0.2);
+      flex-shrink: 0;
+    }
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 400;
+      margin-top: 1px;
+    }
+    main {
+      width: min(880px, 100%);
+      margin: auto;
+      padding: 16px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 14px 36px rgba(15, 39, 56, 0.06);
+      padding: clamp(18px, 3vw, 28px) clamp(20px, 4vw, 36px);
+      text-align: center;
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      color: var(--teal);
+      background: var(--teal-light);
+      padding: 3px 12px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: clamp(24px, 3.2vw, 30px);
+      margin: 0 0 8px;
+      color: #0f2738;
+      font-weight: 800;
+    }
+    .lead {
+      color: #475569;
+      font-size: 14.5px;
+      line-height: 1.6;
+      max-width: 680px;
+      margin: 0 auto 16px;
+    }
+    .download-action {
+      margin: 0 auto 14px;
+    }
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: var(--teal);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(8, 121, 110, 0.25);
+      transition: all .15s ease;
+      border: 0;
+      cursor: pointer;
+    }
+    .btn-download:hover:not(:disabled) {
+      background: var(--teal-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(8, 121, 110, 0.32);
+    }
+    .btn-download:disabled, .btn-download[aria-disabled="true"] {
+      opacity: .6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .version-info {
+      display: block;
+      color: #94a3b8;
+      font-size: 11.5px;
+      margin-top: 6px;
+    }
+    /* Connected state banner */
+    .connected-banner {
+      display: none;
+      background: var(--success-light);
+      border: 1.5px solid #a7f3d0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin: 0 auto 14px;
+      max-width: 680px;
+      text-align: left;
+      animation: fadeIn .3s ease-out;
+    }
+    .connected-banner.active {
+      display: block;
+    }
+    .connected-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #065f46;
+      font-size: 15.5px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .connected-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #10b981;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .connected-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #334155;
+      border: 1px solid #d1fae5;
+      margin-bottom: 10px;
+    }
+    .connected-meta div b {
+      display: block;
+      color: #64748b;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .btn-open-sidebar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #059669;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+    .btn-open-sidebar:hover {
+      background: #047857;
+    }
+    /* Steps section */
+    .steps {
+      max-width: 680px;
+      margin: 14px auto 0;
+      text-align: left;
+      display: grid;
+      gap: 8px;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 11px;
+      align-items: start;
+      color: #334155;
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--teal-light);
+      color: var(--teal);
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .step strong {
+      color: #0f172a;
+      font-size: 14px;
+    }
+    /* SmartScreen Help */
+    .tip-box {
+      max-width: 680px;
+      margin: 12px auto 0;
+      padding: 10px 14px;
+      border: 1px solid #fed7aa;
+      border-radius: 12px;
+      background: var(--amber-light);
+      color: #78350f;
+      font-size: 12.5px;
+      line-height: 1.55;
+      text-align: left;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .tip-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .notice {
+      max-width: 680px;
+      margin: 10px auto 0;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .notice.secure {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    .footer {
+      margin-top: 12px;
+      color: #94a3b8;
+      font-size: 11.5px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media(max-width: 480px) {
+      main { padding: 12px 10px; }
+      .card { border-radius: 16px; padding: 16px; }
+      .btn-download { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/doctor-icon.png" class="brand-logo" alt="Doctor Assistant Logo">
+      <div>
+        Sidebar Doctor Assistant
+        <small>Workstation Setup · ติดตั้งไอคอนพี่หมอ</small>
+      </div>
+    </div>
+    <div id="topLinks">
+      <a href="/assistant/" style="color:var(--teal);text-decoration:none;font-size:12px;font-weight:700">เปิด Sidebar →</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="eyebrow">WORKSTATION INSTALLATION</div>
+      <h1>ติดตั้ง Companion ลงเครื่องตรวจ</h1>
+      <p class="lead">
+        ดาวน์โหลดโปรแกรมลงเครื่องที่ใช้ HOSxP โปรแกรมจะติดตั้งตัวเองในโปรไฟล์ผู้ใช้ สร้างทางลัดบนหน้าจอ และลงทะเบียนเครื่องกับ Server อัตโนมัติโดยไม่ต้องพิมพ์รหัสใด ๆ
+      </p>
+
+      <!-- Connected State (Visible when Companion is running) -->
+      <div class="connected-banner" id="connectedBanner">
+        <div class="connected-head">
+          <div class="connected-badge">✓</div>
+          <div>ติดตั้งและเชื่อมต่อกับ Server สำเร็จแล้ว!</div>
+        </div>
+        <div class="connected-meta">
+          <div>
+            <b>เครื่องที่ตรวจพบ</b>
+            <span id="connWorkstation">-</span>
+          </div>
+          <div>
+            <b>ผู้ใช้งาน HOSxP</b>
+            <span id="connUser">-</span>
+          </div>
+          <div>
+            <b>สถานะการเชื่อมต่อ</b>
+            <span style="color:#059669;font-weight:700">● กำลังส่ง Heartbeat ปกติ</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn-open-sidebar" href="/assistant/" target="_blank">🚀 เปิดหน้าจอ Sidebar Doctor Assistant</a>
+        </div>
+      </div>
+
+      <!-- Action Button Area -->
+      <div class="download-action" id="downloadArea">
+        <a class="btn-download" id="installLink" href="/install/companion.exe" download aria-disabled="true" style="opacity:.65;pointer-events:none">
+          กำลังเตรียมไฟล์ติดตั้ง...
+        </a>
+        <span class="version-info" id="versionText">Sidebar Doctor Assistant · Companion</span>
+      </div>
+
+      <!-- Steps Guide -->
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <div>
+            <strong>คลิกปุ่มดาวน์โหลด Companion ด้านบน</strong><br>
+            ระบบจะสร้าง Token สำหรับลงทะเบียนเครื่องตรวจนี้ให้อัตโนมัติ (อายุตั๋ว 30 นาที)
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <div>
+            <strong>เปิดไฟล์ที่ดาวน์โหลดมาจากแถบดาวน์โหลดของเบราว์เซอร์</strong><br>
+            โปรแกรมจะคัดลอกตัวเองไปยัง <code>%LOCALAPPDATA%\SidebarDoctorAssistant</code> และสร้างไอคอนทางลัดบนหน้าจอ Desktop และ Startup ให้อัตโนมัติ
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <div>
+            <strong>ไอคอนพี่หมอจะปรากฏที่มุมจอและตรวจจับคนไข้จาก HOSxP</strong><br>
+            เมื่อคลิกที่ไอคอนพี่หมอ หน้าต่าง Sidebar ข้อมูลผู้ป่วยและยาจะเปิดขึ้นมาทันที
+          </div>
+        </div>
+      </div>
+
+      <!-- SmartScreen Tip -->
+      <div class="tip-box">
+        <div class="tip-icon">🛡️</div>
+        <div>
+          <strong>คำแนะนำกรณี Windows แสดงหน้าต่างสีฟ้า "Windows protected your PC":</strong><br>
+          เนื่องจากเป็นโปรแกรมภายในโรงพยาบาล ให้คลิกที่ข้อความ <u>More info</u> (ข้อมูลเพิ่มเติม) แล้วเลือกปุ่ม <b>Run anyway</b> (ทำงานต่อไป) โปรแกรมจะเริ่มทำงานทันที
+        </div>
+      </div>
+
+      <div class="notice" id="notice">
+        การลงทะเบียนจากเครื่องตรวจต้องเปิดผ่าน HTTPS หรืออยู่ในเครือข่าย LAN ที่ได้รับอนุญาต (สำหรับการทดสอบบน Server รองรับ localhost ได้)
+      </div>
+
+      <div class="footer">
+        โปรแกรมทำงานแบบ Read-only ดึงข้อมูลประกอบการตัดสินใจจาก HOSxP เท่านั้น · ไม่มีการเขียนหรือแก้ไขเวชระเบียน
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const el = id => document.getElementById(id);
+    let checkInterval = null;
+
+    // 1. Fetch server & companion version
+    fetch('/api/version', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(v => {
+        el('versionText').textContent = `Product v${v.version} · Server build ${v.build}`;
+      })
+      .catch(() => {});
+
+    // 2. Request one-time install ticket
+    fetch('/api/install/ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+      cache: 'no-store'
+    })
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok || !data.success) throw new Error(data.error || 'เตรียมไฟล์ติดตั้งไม่สำเร็จ');
+      const link = el('installLink');
+      link.href = `/install/companion.exe?ticket=${encodeURIComponent(data.ticket)}`;
+      link.textContent = '⬇ ดาวน์โหลดและติดตั้ง Companion';
+      link.style.opacity = '1';
+      link.style.pointerEvents = 'auto';
+      link.setAttribute('aria-disabled', 'false');
+
+      link.addEventListener('click', () => {
+        link.textContent = '⏳ เริ่มดาวน์โหลดแล้ว... กรุณาเปิดไฟล์';
+        startStatusPolling();
+      });
+    })
+    .catch(error => {
+      const link = el('installLink');
+      link.textContent = 'ไม่สามารถเตรียมไฟล์ติดตั้ง';
+      const notice = el('notice');
+      notice.className = 'notice';
+      notice.textContent = error.message;
+    });
+
+    // 3. Network protocol indicator
+    if (location.protocol === 'https:' || ['localhost', '127.0.0.1', '::1'].includes(location.hostname)) {
+      const n = el('notice');
+      n.className = 'notice secure';
+      n.textContent = '✓ การเชื่อมต่อพร้อมสำหรับการลงทะเบียน: ตรวจสอบความปลอดภัยเครือข่ายเรียบร้อย';
+    }
+
+    // 4. Real-time Status Polling
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/install/status', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.connected) {
+          el('connectedBanner').classList.add('active');
+          el('connWorkstation').textContent = data.workstation || 'Workstation';
+          el('connUser').textContent = data.user || 'กำลังรอแพทย์เข้าสู่ระบบ HOSxP';
+          const link = el('installLink');
+          link.textContent = '✓ Companion กำลังทำงานอยู่บนเครื่องนี้แล้ว';
+          link.style.background = '#059669';
+        }
+      } catch (_) {}
+    }
+
+    function startStatusPolling() {
+      if (checkInterval) return;
+      checkStatus();
+      checkInterval = setInterval(checkStatus, 2500);
+    }
+
+    // Check immediately on load in case it's already installed
+    checkStatus();
+    startStatusPolling();
+  </script>
+</body>
+</html>

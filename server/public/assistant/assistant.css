@@ -45,6 +45,7 @@ body {
   font-weight: 700;
   color: #0f766e;
 }
+.app-name{white-space:nowrap}
 
 .icon-pulse {
   font-size: 11px;
@@ -54,6 +55,28 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.btn-audio-toggle {
+  min-width: 30px;
+  height: 25px;
+  padding: 2px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.btn-audio-toggle[aria-pressed="true"] {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+.btn-audio-toggle:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
 }
 
 .font-scaler-box {
@@ -253,6 +276,103 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.allergy-banner {
+  border: 1px solid;
+  border-radius: 11px;
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+.allergy-banner[hidden]{display:none!important}
+.allergy-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+}
+.allergy-status-label {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 8px;
+  background: rgba(255,255,255,.7);
+}
+.allergy-banner-detail {
+  margin-top: 5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.allergy-recorded {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+.allergy-none {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.allergy-unknown {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+/* ─── การ์ดแจ้งเตือนกลับมาตรวจซ้ำที่ห้องฉุกเฉิน (ER Revisit 48 ชม.) ─── */
+.er-revisit-banner {
+  background: #fff1f2;
+  border: 1.5px solid #f43f5e;
+  border-radius: 11px;
+  padding: 9px 12px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.12);
+  animation: erPulse 2.5s infinite ease-in-out;
+}
+@keyframes erPulse {
+  0%, 100% { border-color: #f43f5e; box-shadow: 0 2px 8px rgba(244, 63, 94, 0.12); }
+  50% { border-color: #e11d48; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.28); }
+}
+.er-revisit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.er-revisit-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.er-revisit-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+.er-revisit-title {
+  font-size: 12.5px;
+  color: #9f1239;
+  font-weight: 800;
+}
+.er-hours-badge {
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 750;
+  padding: 1.5px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+.er-revisit-detail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #fecdd3;
+  font-size: 11.5px;
+  color: #881337;
+  line-height: 1.55;
+  word-break: break-word;
 }
 
 /* ─── Card Sections ─── */
@@ -885,6 +1005,15 @@ body {
   pointer-events: none;
 }
 
+.app-notice-region{position:fixed;left:50%;top:18px;z-index:100500;display:grid;gap:8px;width:min(460px,calc(100vw - 28px));transform:translateX(-50%);pointer-events:none}
+.app-notice{display:grid;grid-template-columns:34px 1fr 28px;align-items:center;gap:10px;padding:12px 14px;background:#fff;border:1px solid #dce5ee;border-radius:14px;box-shadow:0 14px 38px #142b3b24;pointer-events:auto;animation:noticeIn .22s ease-out}
+.app-notice-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:11px;background:#e8f5f3;font-size:16px}
+.app-notice-message{color:#284057;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.app-notice-close{width:26px;height:26px;border:0;border-radius:8px;background:#f1f5f9;color:#64748b;font-size:17px;cursor:pointer}
+.app-notice-warning .app-notice-icon{background:#fff4d8}.app-notice-error .app-notice-icon{background:#ffeded}.app-notice-success .app-notice-icon{background:#e7f8ee}.app-notice-info .app-notice-icon{background:#eaf4ff;color:#2563a6}
+.app-notice-exit{opacity:0;transform:translateY(-8px);transition:opacity .2s ease,transform .2s ease}
+@keyframes noticeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
 .alert-toast {
   pointer-events: auto;
   background: #ffffff;
@@ -1288,8 +1417,8 @@ body {
 
 .history-modal-card {
   background: #ffffff;
-  width: min(94vw, 840px);
-  max-width: 860px;
+  width: min(96vw, 520px);
+  max-width: 520px;
   max-height: 90vh;
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
@@ -1351,8 +1480,10 @@ body {
 }
 
 .history-modal-body {
-  padding: 12px 18px;
+  padding: 10px 12px;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   flex-grow: 1;
 }
 
@@ -1364,26 +1495,30 @@ body {
 .history-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 11.5px;
+  table-layout: fixed;
+  box-sizing: border-box;
 }
 
 .history-table th {
   background: #f8fafc;
   color: #334155;
   font-weight: 700;
-  padding: 7px 8px;
+  padding: 6px 5px;
   text-align: left;
   border-bottom: 2px solid #e2e8f0;
-  white-space: nowrap;
-  font-size: 12px;
+  white-space: normal;
+  font-size: 11.5px;
+  word-break: break-word;
 }
 
 .history-table td {
-  padding: 7px 8px;
+  padding: 6px 5px;
   border-bottom: 1px solid #f1f5f9;
   color: #1e293b;
   vertical-align: middle;
-  font-size: 12px;
+  font-size: 11.5px;
+  word-break: break-word;
 }
 
 .history-table tr:hover {
@@ -2194,21 +2329,51 @@ body.scale-130 .history-table th, body.scale-130 .history-table td { font-size: 
 
 .lab-quick-chips {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 5px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 6px 8px;
   margin-bottom: 8px;
-  flex-wrap: wrap;
+  box-sizing: border-box;
+  width: 100%;
 }
-
 .lab-chips-label {
   font-size: 11px;
   font-weight: 700;
   color: #475569;
+}
+#labChipGroup {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+#labChipGroup .btn-toggle-pill {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 2.5px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #334155;
   white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+#labChipGroup .btn-toggle-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+#labChipGroup .btn-toggle-pill.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.25);
 }
 
 
@@ -2319,3 +2484,17 @@ body.scale-130 .history-table th, body.scale-130 .history-table td { font-size: 
   box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
   transform: translateY(-1px);
 }
+.product-build{font-size:10px;color:#718096;margin-left:5px;white-space:nowrap}
+.session-lock-overlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px;background:#f3f7fb}
+.session-lock-overlay[hidden]{display:none!important}
+.session-lock-card{width:min(430px,100%);padding:28px;text-align:center;background:#fff;border:1px solid #d9e4ed;border-radius:16px;box-shadow:0 16px 50px #142b3b20}
+.session-lock-icon{font-size:32px}.session-lock-card h1{font-size:21px;color:#173d60}.session-lock-card p{color:#5e7184}.session-lock-card small{color:#7a8998}
+.hosxp-login-form{display:grid;gap:9px;margin:20px 0;text-align:left}.hosxp-login-form label{font-size:12px;font-weight:700;color:#29445d}.hosxp-login-form input{width:100%;height:43px;padding:0 12px;border:1px solid #ccd9e5;border-radius:9px;font:inherit;color:#17324b;background:#fff;outline:none}.hosxp-login-form input:focus{border-color:#138a80;box-shadow:0 0 0 3px #138a8018}.hosxp-login-form button{height:44px;margin-top:4px;border:0;border-radius:9px;background:#087e75;color:#fff;font:inherit;font-weight:700;cursor:pointer}.hosxp-login-form button:disabled{opacity:.65;cursor:wait}.hosxp-login-form .login-privacy-note{margin-top:4px;text-align:center;line-height:1.5}.login-error{margin:2px 0;color:#b42318;font-size:12px;text-align:center}.login-error[hidden]{display:none}
+.btn-session-logout{border:1px solid #d6e0e8;border-radius:8px;padding:5px 9px;background:#fff;color:#53687b;font:inherit;font-size:11px;cursor:pointer}.btn-session-logout[hidden]{display:none}
+body.session-locked>:not(#sessionLockOverlay){display:none!important}
+.privacy-footer{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;color:#75879a;font-size:10px;border-top:1px solid #e1e9ef;background:#f8fafc}
+.privacy-footer button{border:0;background:none;padding:0;color:#376d9b;text-decoration:underline;font:inherit;cursor:pointer}
+.privacy-modal{position:fixed;inset:0;z-index:100000;background:#142b3b88;display:grid;place-items:center;padding:18px}
+.privacy-modal[hidden]{display:none}
+.privacy-modal-card{position:relative;width:min(620px,100%);max-height:85vh;overflow:auto;padding:26px;background:#fff;border-radius:14px;box-shadow:0 20px 60px #0004;color:#243b50;line-height:1.65}
+.privacy-modal-card h2{margin:0 35px 14px 0}.privacy-close{position:absolute;right:14px;top:10px;border:0;background:none;font-size:28px;cursor:pointer;color:#617487}

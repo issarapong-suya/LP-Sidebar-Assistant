@@ -2,44 +2,241 @@
 <html lang="th">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ตั้งค่า Sidebar Doctor Assistant</title>
-  <style>
-    *{box-sizing:border-box}body{margin:0;background:#f3f7fb;color:#142b3b;font:15px/1.55 "Segoe UI",Tahoma,sans-serif}
-    main{max-width:760px;margin:36px auto;padding:0 18px}.panel{background:#fff;border:1px solid #dbe6ed;border-radius:16px;padding:26px;box-shadow:0 12px 36px #21445e12}
-    h1{margin:0 0 5px;font-size:25px}.sub{color:#587184;margin:0 0 22px}.step{font-size:17px;font-weight:700;margin:22px 0 10px;padding-bottom:7px;border-bottom:1px solid #e7eef3}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:13px;font-weight:650;color:#334d5d}input,textarea{width:100%;margin-top:5px;padding:10px 11px;border:1px solid #cbd9e1;border-radius:8px;font:inherit;color:#142b3b;background:#fff}input:focus,textarea:focus{outline:2px solid #62b6aa;border-color:#62b6aa}.wide{grid-column:1/-1}.help{color:#6c7f8b;font-size:12px;margin:4px 0 0}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}button{border:0;border-radius:9px;padding:11px 17px;font:inherit;font-weight:700;cursor:pointer;background:#11675e;color:white}button.secondary{background:#e9f2f5;color:#174153}.status{padding:10px 12px;border-radius:8px;margin-top:13px;display:none}.status.ok{display:block;background:#e5f7ee;color:#17613b}.status.error{display:block;background:#fff0ee;color:#8a2d22}.notice{background:#fff8df;color:#69511d;border-radius:9px;padding:11px 13px;font-size:13px;margin-top:18px}.badge{display:inline-block;background:#e5f2f1;color:#17675f;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}@media(max-width:600px){main{margin:15px auto}.panel{padding:18px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+  <meta name="theme-color" content="#0d766d">
+  <title>ตั้งค่าระบบ · Sidebar Doctor Assistant</title>
+  <link rel="icon" type="image/png" href="/doctor-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fonts/prompt.css">
+    <style>
+    :root{font-family:Prompt,"Segoe UI",Tahoma,sans-serif;color:#172d40;background:#f3f7fa;font-synthesis:none;text-rendering:optimizeLegibility;--green:#08796e;--green-dark:#075a54;--muted:#64748b;--line:#e2eaf0;--blue:#3f7fba;--surface:#fff}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;min-width:320px;min-height:100vh;background:radial-gradient(ellipse at 95% 0%,#dff3ee 0,transparent 33%),#f3f7fa}
+    button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
+    .topbar{height:76px;background:#fff;border-bottom:1px solid #e6edf2;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,4vw,64px);position:sticky;top:0;z-index:5}
+    .brand{display:flex;align-items:center;gap:14px}
+    .brand-logo{width:46px;height:46px;border-radius:12px;object-fit:contain;box-shadow:0 4px 12px rgba(8,121,110,0.2);flex-shrink:0}
+    .brand-title{font-size:18px;font-weight:800;line-height:1.3;color:#0f2738}
+    .brand-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+    .topbar-actions{display:flex;align-items:center;gap:12px}
+    .audit-link{border:1px solid #dce8ed;background:#fff;border-radius:10px;padding:8px 14px;color:#31566b;text-decoration:none;font-size:13px;font-weight:650;transition:all .15s}
+    .audit-link:hover{background:#f3faf8;border-color:#a6d3cb}
+    .build-chip{border:1px solid #d7e8e7;background:#f2fbf8;color:#39756e;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:650;white-space:nowrap}
+    .layout{width:100%;max-width:1400px;margin:0 auto;padding:20px clamp(16px,2.5vw,42px) 28px;display:grid;grid-template-columns:290px minmax(0,1fr);gap:24px;align-items:start}
+    .stepper{position:sticky;top:92px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px 16px;box-shadow:0 8px 24px #23415b0b}
+    .stepper-kicker{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#8393a3;padding:0 10px}
+    .stepper h2{font-size:20px;font-weight:800;margin:6px 10px 16px;color:#0f2738}
+    .step-nav{display:grid;gap:6px}
+    .step-nav button{border:0;background:transparent;text-align:left;display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;color:#5d7184;transition:.18s}
+    .step-nav button:hover:not(:disabled){background:#f5f9fa}
+    .step-nav button.active{background:#eaf7f4;color:#075e57}
+    .step-nav button.complete .step-num{background:#d8f4eb;color:#08796e}
+    .step-nav button:disabled{opacity:.48;cursor:not-allowed}
+    .step-num{width:36px;height:36px;border:1px solid #dce6ec;border-radius:11px;display:grid;place-items:center;font-size:14px;font-weight:800;background:#fff}
+    .active .step-num{background:var(--green);border-color:var(--green);color:#fff}
+    .step-copy b{display:block;font-size:14.5px;font-weight:700}
+    .step-copy small{display:block;font-size:12px;margin-top:2px;color:#8a9aab}
+    .step-rule{height:1px;background:var(--line);margin:16px 3px}
+    .side-help{padding:0 8px;font-size:12.5px;color:#64748b;line-height:1.65}
+    .side-help strong{color:#1e3a4c}
+    .workspace{min-width:0}
+    .welcome{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 4px 12px}
+    .welcome h1{font-size:clamp(24px,2.4vw,30px);letter-spacing:-.03em;margin:0;font-weight:800;color:#0f2738}
+    .welcome p{margin:4px 0 0;color:#64748b;font-size:14.5px}
+    .step-count{color:#688094;font-size:13.5px;font-weight:600;white-space:nowrap;padding-bottom:3px}
+    .progress-track{height:6px;background:#e4ecef;border-radius:9px;overflow:hidden;margin:0 4px 16px}
+    .progress-fill{height:100%;width:25%;background:linear-gradient(90deg,#079586,#38b29a);border-radius:inherit;transition:width .25s ease}
+    .panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 28px #23415b0b;overflow:hidden}
+    .panel-head{padding:18px 26px 16px;border-bottom:1px solid #edf1f4;display:flex;align-items:flex-start;gap:14px}
+    .head-icon{flex:none;width:42px;height:42px;border-radius:12px;background:#e8f6f3;color:#08796e;display:grid;place-items:center;font-size:20px}
+    .panel-head h2{font-size:19px;font-weight:800;margin:0 0 3px;color:#0f2738}
+    .panel-head p{font-size:14px;color:#64748b;margin:0}
+    .panel-body{padding:22px 26px 24px}
+    .wizard-step[hidden]{display:none!important}
+    .section-label{font-size:12.5px;color:#64748b;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 12px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px}
+    .field{min-width:0}
+    .field.full{grid-column:1/-1}
+    .field label{display:flex;align-items:center;gap:6px;font-size:14.5px;font-weight:700;color:#1e293b}
+    .required{color:#d45d56}
+    .input-wrap{position:relative}
+    .field input,.field select{display:block;width:100%;height:46px;margin-top:6px;padding:0 14px;border:1px solid #d9e3e9;border-radius:11px;background:#fff;color:#19364a;font-size:14.5px;outline:none;transition:border-color .18s,box-shadow .18s}
+    .field input::placeholder{color:#aab7c1}
+    .field input:focus,.field select:focus{border-color:#53aa9d;box-shadow:0 0 0 3px #2ca58e1c}
+    .field-help{font-size:12px;color:#64748b;line-height:1.55;margin-top:5px}
+    .field input[type=password]{padding-right:48px}
+    .toggle-secret{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border:0;border-radius:8px;background:#f0f5f7;color:#64798b;font-size:14px}
+    .info-box{display:flex;gap:12px;padding:13px 16px;border-radius:12px;background:#f1f8fc;border:1px solid #dbeaf2;color:#475569;font-size:13.5px;line-height:1.65}
+    .info-box .info-icon{font-size:19px;flex-shrink:0}
+    .info-box strong{color:#1e293b;font-size:14.5px}
+    .info-box.warn{background:#fff9e9;border-color:#f3e7bd;color:#78350f}
+    .info-box.success{background:#eef9f4;border-color:#d2ecdf;color:#166534}
+    .info-box.error{background:#fff1ef;border-color:#f2d2cd;color:#991b1b}
+    .db-status{display:none;margin-top:16px;font-size:13.5px}
+    .db-status.show{display:flex}
+    .status-dot{width:9px;height:9px;background:#20a36c;border-radius:50%;margin-top:7px;flex:none}
+    .db-status.error .status-dot{background:#d65c55}
+    .mapping-card{border:1px solid #e5edf1;border-radius:14px;padding:18px;background:#fbfdfe}
+    .mapping-card h3{font-size:15px;font-weight:750;margin:0 0 4px;color:#0f2738}
+    .mapping-card p{font-size:12.5px;color:#64748b;margin:0 0 14px}
+    .mapping-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px}
+    .summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:22px}
+    .summary-card{background:#f8fbfc;border:1px solid #e4edf1;border-radius:14px;padding:16px}
+    .summary-card small{display:block;font-size:12px;color:#64748b}
+    .summary-card b{font-size:15.5px;display:block;margin-top:5px;overflow-wrap:anywhere;color:#0f2738}
+    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 12px;background:#eaf7f1;color:#166534;font-size:12px;font-weight:700}
+    .pill:before{content:"";width:7px;height:7px;border-radius:50%;background:#26a675}
+    .actions{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:22px}
+    .actions-right{display:flex;align-items:center;gap:12px}
+    .btn{min-height:44px;padding:0 22px;border:1px solid transparent;border-radius:11px;font-size:14px;font-weight:750;transition:transform .15s,box-shadow .15s,background .15s}
+    .btn:hover:not(:disabled){transform:translateY(-1px)}
+    .btn-primary{background:linear-gradient(135deg,#108579,#08695f);color:#fff;box-shadow:0 6px 16px #08796e26}
+    .btn-primary:hover:not(:disabled){box-shadow:0 8px 22px #08796e38}
+    .btn-secondary{background:#fff;border-color:#dbe5ea;color:#334155}
+    .btn-test{background:#eaf5f7;border-color:#d9e9ec;color:#1e4d58}
+    .btn-ghost{background:transparent;color:#475569}
+    .btn-icon{font-size:16px;margin-right:7px}
+    .inline-status{font-size:13px;color:#64748b}
+    .companion-box{display:grid;gap:10px}
+    .token-row{display:flex;align-items:center;gap:10px;min-width:0}
+    .token-value{font-family:Consolas,monospace;word-break:break-all;background:#fff;border:1px solid #e5dfc7;border-radius:9px;padding:10px 12px;flex:1;color:#564d32;font-size:12.5px}
+    .copy-token{border:1px solid #d9e5e8;border-radius:10px;background:#fff;padding:9px 13px;color:#3b6470;font-size:12.5px;font-weight:650;white-space:nowrap}
+    .page-footer{display:flex;justify-content:space-between;gap:18px;color:#8291a0;font-size:12px;padding:14px 4px}
+    .page-footer a{color:#08796e;font-weight:600;text-decoration:none}
+    .grant-details{margin-top:14px;padding:14px 16px;border:1px solid #ead9d6;border-radius:12px;background:#fffafa;color:#5d4a48;font-size:12.5px}
+    .grant-details summary{cursor:pointer;font-weight:700;color:#8b4039;font-size:13px}
+    .grant-identity{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+    .grant-identity div{padding:10px 12px;background:#fff;border:1px solid #eee5e3;border-radius:9px;overflow-wrap:anywhere}
+    .grant-identity small{display:block;color:#8b8f94;font-size:11px}
+    .grant-identity b{font-size:13px}
+    .grant-lines{margin:8px 0 0;padding:12px 14px 12px 30px;background:#fff;border:1px solid #eee5e3;border-radius:9px;max-height:180px;overflow:auto}
+    .grant-lines li{font:12px/1.6 Consolas,monospace;overflow-wrap:anywhere;margin:3px 0}
+    @media(max-width:920px){.layout{grid-template-columns:1fr;gap:18px;padding-top:18px}.stepper{position:static;padding:14px 16px}.stepper-kicker,.stepper h2,.step-rule,.side-help{display:none}.step-nav{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px}.step-nav button{min-width:180px;grid-template-columns:32px 1fr;padding:8px 10px}.step-num{width:32px;height:32px;border-radius:10px}.topbar{height:68px}.panel-body{padding:20px}}
+    @media(max-width:580px){.topbar{padding:0 15px}.brand-logo{width:38px;height:38px;border-radius:10px}.brand-title{font-size:15px}.brand-sub{font-size:11px}.topbar-actions{gap:6px}.audit-link{font-size:11px;padding:7px 10px;white-space:nowrap}.build-chip{display:none}.layout{padding:16px 12px 30px}.welcome{align-items:flex-start;flex-direction:column;gap:4px;padding-bottom:12px}.welcome h1{font-size:24px}.step-count{font-size:12px}.panel{border-radius:16px}.panel-head{padding:16px 18px;gap:12px}.panel-head h2{font-size:16px}.head-icon{width:38px;height:38px;font-size:18px}.panel-body{padding:18px 16px}.form-grid,.mapping-grid{grid-template-columns:1fr;gap:14px}.field.full{grid-column:auto}.summary-grid{grid-template-columns:1fr 1fr;gap:10px}.summary-card{padding:13px}.summary-card:last-child{grid-column:1/-1}.actions{align-items:stretch;flex-direction:column-reverse}.actions-right{justify-content:space-between}.actions .btn{flex:1;padding:0 12px}.inline-status{font-size:11px}.page-footer{flex-direction:column;gap:6px}.step-nav button{min-width:150px}.step-copy b{font-size:13px}.step-copy small{font-size:11px}.grant-identity{grid-template-columns:1fr}}
   </style>
 </head>
-<body><main><section class="panel">
-  <span class="badge">ตั้งค่าครั้งแรก / ผู้ดูแลระบบ</span>
-  <h1>Sidebar Doctor Assistant</h1>
-  <p class="sub">ตั้งค่าการเชื่อมต่อ HOSxP และข้อมูลของโรงพยาบาล ระบบนี้เก็บเฉพาะค่าที่จำเป็นต่อ Sidebar และไอคอนพี่หมอ</p>
-  <div class="step">1. ข้อมูลโรงพยาบาลและ Server</div>
-  <div class="grid">
-    <label>ชื่อโรงพยาบาล<input id="hospitalName" placeholder="เช่น โรงพยาบาลตัวอย่าง"></label>
-    <label>รหัสสถานพยาบาล<input id="hospitalCode" placeholder="เช่น 12345"></label>
-    <label>พอร์ต Server<input id="serverPort" type="number" min="1" max="65535" value="3030"></label>
-    <label class="wide">IP/Prefix เครือข่ายที่อนุญาต<input id="allowedLanSubnets" value="127.0.0.1,::1,192.168.1." placeholder="127.0.0.1,::1,10.10.20."><div class="help">คั่นแต่ละรายการด้วยจุลภาค ระบุ prefix พร้อมจุดท้าย เช่น 10.10.20. เพื่ออนุญาตทั้งวงย่อย</div></label>
-  </div>
-  <div class="step">2. ฐานข้อมูล HOSxP (แนะนำบัญชีแบบอ่านอย่างเดียว)</div>
-  <div class="grid">
-    <label>Host<input id="dbHost" placeholder="IP หรือชื่อเครื่องฐานข้อมูล"></label>
-    <label>Port<input id="dbPort" type="number" value="3306"></label>
-    <label>ชื่อฐานข้อมูล<input id="dbName" placeholder="เช่น hosxp"></label>
-    <label>ผู้ใช้ฐานข้อมูล<input id="dbUser" autocomplete="off"></label>
-    <label class="wide">รหัสผ่าน<input id="dbPassword" type="password" autocomplete="new-password"><div class="help" id="passwordHelp">รหัสผ่านจะถูกเก็บไว้ใน config.json บน Server เท่านั้น และไม่ส่งให้เครื่องลูกข่าย</div></label>
-    <label>รหัส Lab Creatinine<input id="creatinineLabCode" value="155"><div class="help">ใช้ระบุรายการ Creatinine สำหรับคำนวณค่าการทำงานของไต</div></label>
-    <label>Charset คอลัมน์ชื่อผู้ป่วย<select id="searchCharset"><option value="tis620">TIS-620 / tis620_thai_ci</option><option value="utf8mb4">UTF-8 / utf8mb4</option></select><div class="help">เลือกตาม CHARACTER_SET_NAME ของ pname, fname และ lname ในฐาน HOSxP</div></label>
-  </div>
-  <div class="actions"><button class="secondary" id="testButton" type="button">ทดสอบฐานข้อมูล</button><button id="saveButton" type="button">บันทึกและเริ่มระบบ</button></div>
-  <div id="status" class="status" role="status"></div>
-  <div class="notice">เปิดหน้านี้จากเครื่อง Server ด้วย <b>http://localhost:3030/setup</b> เท่านั้น หลังบันทึกระบบจะเริ่มใหม่ แล้วเปิด Sidebar ได้ที่ <b>http://&lt;server-ip&gt;:3030/assistant/</b></div>
-</section></main>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="/doctor-icon.png" class="brand-logo" alt="Doctor Assistant Logo"><div><div class="brand-title">Sidebar Doctor Assistant</div><div class="brand-sub">Hospital setup center</div></div></div>
+    <div class="topbar-actions"><a class="audit-link" href="/setup/companion/">จัดการ Companion</a><a class="audit-link" href="/setup/audit/">ประวัติการใช้งาน</a><div class="build-chip">PRODUCT v1&nbsp; · &nbsp;BUILD 20261107.12</div></div>
+  </header>
+
+  <main class="layout">
+    <aside class="stepper" aria-label="ลำดับการตั้งค่า">
+      <div class="stepper-kicker">Configuration</div><h2>ตั้งค่าระบบ</h2>
+      <nav class="step-nav">
+        <button type="button" class="active" data-step="0"><span class="step-num">1</span><span class="step-copy"><b>ฐานข้อมูล HOSxP</b><small>จำเป็น · ทดสอบก่อน</small></span></button>
+        <button type="button" data-step="1" disabled><span class="step-num">2</span><span class="step-copy"><b>โรงพยาบาลและเครือข่าย</b><small>Server และสิทธิ์เครือข่าย</small></span></button>
+        <button type="button" data-step="2" disabled><span class="step-num">3</span><span class="step-copy"><b>ตั้งค่ารายการ Lab</b><small>ปรับตามข้อมูลโรงพยาบาล</small></span></button>
+        <button type="button" data-step="3" disabled><span class="step-num">4</span><span class="step-copy"><b>ตรวจทานและบันทึก</b><small>ตั้งค่า Server และลงทะเบียน Companion</small></span></button>
+      </nav>
+      <div class="step-rule"></div>
+      <div class="side-help"><strong>เริ่มจากจุดสำคัญ</strong><br>เชื่อมต่อ HOSxP และตรวจสิทธิ์แบบอ่านอย่างเดียวให้ผ่านก่อน จากนั้นจึงตั้งค่าส่วนอื่นได้</div>
+    </aside>
+
+    <section class="workspace">
+      <div class="welcome"><div><h1 id="pageTitle">เชื่อมต่อฐานข้อมูล HOSxP</h1><p id="pageSubtitle">ขั้นตอนแรกที่จำเป็น เพื่อให้ผู้ช่วยแพทย์อ่านข้อมูลจากระบบได้</p></div><div class="step-count" id="stepCount">ขั้นตอน 1 จาก 4</div></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+      <section class="panel">
+        <div class="wizard-step" data-panel="0">
+          <div class="panel-head"><div class="head-icon">▤</div><div><h2>การเชื่อมต่อฐานข้อมูล</h2><p>ใช้บัญชีที่มีสิทธิ์อ่านข้อมูลเท่านั้น การทดสอบไม่มีการเขียนหรือแก้ไขข้อมูลใน HOSxP</p></div></div>
+          <div class="panel-body">
+            <div class="section-label">Connection details</div>
+            <div class="form-grid">
+              <div class="field"><label for="dbHost">Host / IP ฐานข้อมูล <span class="required">*</span></label><input id="dbHost" placeholder="ตัวอย่าง 192.168.1.20" autocomplete="off"><div class="field-help">ชื่อเครื่องหรือ IP ของ MariaDB / MySQL ที่ให้บริการ HOSxP</div></div>
+              <div class="field"><label for="dbPort">Port <span class="required">*</span></label><input id="dbPort" type="number" value="3306" min="1" max="65535"><div class="field-help">ค่าเริ่มต้น 3306</div></div>
+              <div class="field"><label for="dbName">ชื่อฐานข้อมูล HOSxP <span class="required">*</span></label><input id="dbName" placeholder="เช่น hos หรือ hosxp" autocomplete="off"></div>
+              <div class="field"><label for="dbUser">บัญชีฐานข้อมูล <span class="required">*</span></label><input id="dbUser" autocomplete="off" placeholder="บัญชีสำหรับอ่านข้อมูล"></div>
+              <div class="field full"><label for="dbPassword">รหัสผ่านฐานข้อมูล</label><div class="input-wrap"><input id="dbPassword" type="password" autocomplete="new-password" placeholder="กรอกรหัสผ่าน หรือเว้นว่างเพื่อใช้ค่าเดิม"><button class="toggle-secret" id="togglePassword" type="button" aria-label="แสดงหรือซ่อนรหัสผ่าน">◉</button></div><div class="field-help" id="passwordHelp">เก็บไว้ใน config.json บน Server เท่านั้น ไม่ส่งไปยัง browser หรือ Companion</div></div>
+              <div class="field full"><div class="info-box"><span class="info-icon">ⓘ</span><div><strong>ตรวจสิทธิ์แบบอ่านอย่างเดียว</strong><br>ระบบยอมรับ `SELECT` บนฐานข้อมูลอื่นได้ด้วย แต่จะปฏิเสธสิทธิ์เขียนและ `GRANT OPTION` รวมถึง role ที่ตรวจสอบไม่ได้ บัญชีนี้ต้องอ่านตาราง `opduser` ได้เพื่อให้ผู้ใช้เข้าสู่ระบบเมื่อปิด HOSxP</div></div></div>
+            </div>
+            <div class="actions"><span class="inline-status" id="testHint">ทดสอบการเชื่อมต่อเพื่อปลดล็อกขั้นตอนถัดไป</span><div class="actions-right"><button type="button" class="btn btn-test" id="testButton"><span class="btn-icon">⌕</span>ทดสอบฐานข้อมูล</button><button type="button" class="btn btn-primary" id="nextFromDb" disabled>ถัดไป <span class="btn-icon">→</span></button></div></div>
+            <div class="info-box db-status" id="dbStatus" role="status"><span class="status-dot"></span><div id="dbStatusText"></div></div>
+            <details class="grant-details" id="grantDetails" hidden><summary>รายละเอียดบัญชีและสิทธิ์ที่ฐานข้อมูลตอบกลับ</summary><div class="grant-identity" id="grantIdentity"></div><b>SHOW GRANTS</b><ul class="grant-lines" id="grantLines"></ul><p>หากชื่อ account/host หรือรายการสิทธิ์ไม่ตรงกับที่คาด ให้ DBA ตรวจ `CURRENT_USER()` และ grants ของ account@host ที่แสดงตรงนี้</p></details>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-panel="1" hidden>
+          <div class="panel-head"><div class="head-icon">⌂</div><div><h2>ข้อมูลโรงพยาบาลและ Server</h2><p>กำหนดชื่อที่ใช้แสดงและเครือข่ายที่อนุญาตให้เรียก API</p></div></div>
+          <div class="panel-body">
+            <div class="section-label">Hospital profile</div>
+            <div class="form-grid">
+              <div class="field"><label for="hospitalName">ชื่อโรงพยาบาล</label><input id="hospitalName" placeholder="เช่น โรงพยาบาลตัวอย่าง"></div>
+              <div class="field"><label for="hospitalCode">รหัสสถานพยาบาล</label><input id="hospitalCode" placeholder="เช่น 12345"></div>
+            </div>
+            <div class="section-label" style="margin-top:25px">Server access</div>
+            <div class="form-grid">
+              <div class="field"><label for="serverPort">พอร์ตบริการ</label><input id="serverPort" type="number" min="1" max="65535" value="3030"><div class="field-help">หากเปลี่ยนพอร์ต ระบบจะเริ่มบริการใหม่หลังบันทึก</div></div>
+              <div class="field"><label for="allowedLanSubnets">วงเครือข่ายที่อนุญาต</label><input id="allowedLanSubnets" value="127.0.0.1,::1,192.168.1." placeholder="127.0.0.1,::1,10.10.20."><div class="field-help">คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 10.10.20.</div></div>
+            </div>
+            <div class="info-box warn" style="margin-top:22px"><span class="info-icon">⚑</span><div>หน้า Setup จำกัดให้เปิดจากเครื่อง Server เท่านั้น การตรวจ role Admin/IT ของ HOSxP ต้องเชื่อมกับแหล่งสิทธิ์ของโรงพยาบาลก่อนใช้งานจริง</div></div>
+            <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><button type="button" class="btn btn-primary" data-next>ถัดไป <span class="btn-icon">→</span></button></div></div>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-panel="2" hidden>
+          <div class="panel-head"><div class="head-icon">⌁</div><div><h2>ตั้งค่ารายการ Lab</h2><p>กำหนด charset และรหัสรายการให้ตรงกับฐาน HOSxP ของโรงพยาบาล</p></div></div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <div class="field"><label for="searchCharset">Charset ชื่อผู้ป่วย</label><select id="searchCharset"><option value="tis620">TIS-620 / tis620_thai_ci</option><option value="utf8mb4">UTF-8 / utf8mb4</option></select><div class="field-help">เลือกตาม CHARACTER_SET_NAME ของ pname, fname และ lname</div></div>
+              <div class="field"><label for="creatinineLabCode">รหัส Lab Creatinine</label><input id="creatinineLabCode" value="155" placeholder="เช่น 155"><div class="field-help">ใช้คำนวณ eGFR และ CrCl</div></div>
+              <div class="field full"><div class="mapping-card"><h3>รหัส Lab สำหรับดูแนวโน้ม</h3><p>ใส่ได้หลายรหัส คั่นด้วยจุลภาค เว้นว่างเพื่อค้นจากชื่อรายการ</p><div class="mapping-grid">
+                <div class="field"><label for="labCodeK">Potassium (K)</label><input id="labCodeK" placeholder="เช่น 10, 11"></div>
+                <div class="field"><label for="labCodeNa">Sodium (Na)</label><input id="labCodeNa" placeholder="เช่น 12"></div>
+                <div class="field"><label for="labCodeBun">BUN</label><input id="labCodeBun" placeholder="เช่น 20"></div>
+                <div class="field"><label for="labCodeAst">SGOT / AST</label><input id="labCodeAst" placeholder="เช่น 25"></div>
+                <div class="field"><label for="labCodeAlt">SGPT / ALT</label><input id="labCodeAlt" placeholder="เช่น 26"></div>
+                <div class="field"><label for="labCodeUric">Uric Acid</label><input id="labCodeUric" placeholder="เช่น 30"></div>
+                <div class="field"><label for="labCodeLdl">LDL</label><input id="labCodeLdl" placeholder="เช่น 102, 515"></div>
+                <div class="field"><label for="labCodeHct">Hct</label><input id="labCodeHct" placeholder="เช่น 34"></div>
+                <div class="field"><label for="labCodePlatelet">Platelet</label><input id="labCodePlatelet" placeholder="เช่น 33"></div>
+                <div class="field"><label for="labCodeUacr">UACR</label><input id="labCodeUacr" placeholder="เช่น 701"></div>
+              </div></div></div>
+            </div>
+            <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><button type="button" class="btn btn-primary" data-next>ถัดไป <span class="btn-icon">→</span></button></div></div>
+          </div>
+        </div>
+
+        <div class="wizard-step" data-panel="3" hidden>
+          <div class="panel-head"><div class="head-icon">✓</div><div><h2>ตรวจทานและบันทึก</h2><p>ตรวจความถูกต้องก่อนเริ่มใช้ระบบ และเตรียมเชื่อมต่อ Companion</p></div></div>
+          <div class="panel-body">
+            <div class="section-label">Configuration overview</div>
+            <div class="summary-grid"><div class="summary-card"><small>ฐานข้อมูล</small><b id="summaryDatabase">ยังไม่ระบุ</b></div><div class="summary-card"><small>โรงพยาบาล</small><b id="summaryHospital">ยังไม่ระบุ</b></div><div class="summary-card"><small>ผลตรวจสิทธิ์</small><b><span class="pill">SELECT-only ผ่าน</span></b></div></div>
+            <div class="info-box"><span class="info-icon">🔐</span><div>รหัสผ่านฐานข้อมูลจะอยู่บน Server เท่านั้น หลังบันทึก ดาวน์โหลด Companion จากหน้า Install บน workstation ได้โดยตรง</div></div>
+            <div class="info-box warn" style="margin-top:13px"><span class="info-icon">ⓘ</span><div>ก่อนใช้งานจริง โปรดให้ผู้ดูแลระบบ/DPO ของโรงพยาบาลกำหนดผู้มีสิทธิ์ Setup, HTTPS, อายุเก็บ log และตรวจทานนโยบายข้อมูลผู้ป่วย</div></div>
+            <div class="info-box companion-box" id="companionProvision" hidden style="margin-top:13px"></div>
+            <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><span class="inline-status" id="saveHint">ฐานข้อมูลผ่านการทดสอบแล้ว</span><button type="button" class="btn btn-primary" id="saveButton"><span class="btn-icon">✓</span>บันทึกและเริ่มระบบ</button></div></div>
+          </div>
+        </div>
+      </section>
+      <div id="status" class="info-box db-status" role="status" style="margin-top:15px"></div>
+      <footer class="page-footer"><span>Sidebar Doctor Assistant · Product v1 · Build 20261107.07</span><a href="/assistant/">กลับไปหน้า Assistant ↗</a></footer>
+    </section>
+  </main>
+
 <script>
-const el=id=>document.getElementById(id), form=()=>({hospitalName:el('hospitalName').value,hospitalCode:el('hospitalCode').value,port:el('serverPort').value,allowedLanSubnets:el('allowedLanSubnets').value,creatinineLabCode:el('creatinineLabCode').value,searchCharset:el('searchCharset').value,hosxp:{host:el('dbHost').value,port:el('dbPort').value,database:el('dbName').value,user:el('dbUser').value,password:el('dbPassword').value}});
-function message(text,ok){const box=el('status');box.textContent=text;box.className=`status ${ok?'ok':'error'}`}
-async function request(url){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form())});const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'เกิดข้อผิดพลาด');return data}
-el('testButton').onclick=async()=>{el('testButton').disabled=true;try{const data=await request('/api/setup/test-database');message(`เชื่อมต่อสำเร็จ: ${data.database}`,true)}catch(error){message(error.message,false)}finally{el('testButton').disabled=false}};
-el('saveButton').onclick=async()=>{el('saveButton').disabled=true;try{const data=await request('/api/setup/save');message(data.message,true);setTimeout(()=>location.href=`${location.protocol}//${location.hostname}:${data.port}/assistant/`,1800)}catch(error){message(error.message,false)}finally{el('saveButton').disabled=false}};
-fetch('/api/setup/status').then(r=>r.json()).then(({config})=>{if(!config)return;el('hospitalName').value=config.hospitalName||'';el('hospitalCode').value=config.hospitalCode||'';el('serverPort').value=config.port||3030;el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||[]).join(',');el('dbHost').value=config.hosxp?.host||'';el('dbPort').value=config.hosxp?.port||3306;el('dbName').value=config.hosxp?.database||'';el('dbUser').value=config.hosxp?.user||'';el('creatinineLabCode').value=config.schema?.creatinineLabCode||'155';el('searchCharset').value=config.schema?.searchCharset||'tis620';el('passwordHelp').textContent='เว้นว่างไว้เพื่อคงรหัสผ่านเดิม'}).catch(()=>{});
-</script></body></html>
+'use strict';
+const el=id=>document.getElementById(id);
+const stepTitles=[['เชื่อมต่อฐานข้อมูล HOSxP','ขั้นตอนแรกที่จำเป็น เพื่อให้ผู้ช่วยแพทย์อ่านข้อมูลจากระบบได้'],['ตั้งค่าโรงพยาบาลและ Server','กำหนดชื่อและวงเครือข่ายที่ให้บริการ'],['ตั้งค่ารายการ Lab','ปรับ charset และรหัสรายการให้ตรงกับ HOSxP'],['ตรวจทานและบันทึก','ตรวจค่าทั้งหมด แล้วเริ่มระบบ']];
+let currentStep=0, testedFingerprint='';
+const dbFields=['dbHost','dbPort','dbName','dbUser','dbPassword'];
+function form(){return {hospitalName:el('hospitalName').value,hospitalCode:el('hospitalCode').value,port:el('serverPort').value,allowedLanSubnets:el('allowedLanSubnets').value,creatinineLabCode:el('creatinineLabCode').value,searchCharset:el('searchCharset').value,labTrendCodes:{ldl:el('labCodeLdl').value,hct:el('labCodeHct').value,platelet:el('labCodePlatelet').value,uacr:el('labCodeUacr').value,potassium:el('labCodeK').value,sodium:el('labCodeNa').value,bun:el('labCodeBun').value,ast:el('labCodeAst').value,alt:el('labCodeAlt').value,uric:el('labCodeUric').value},hosxp:{host:el('dbHost').value,port:el('dbPort').value,database:el('dbName').value,user:el('dbUser').value,password:el('dbPassword').value}}}
+function fingerprint(){return JSON.stringify(dbFields.map(id=>el(id).value.trim()))}
+function setStatus(text,type){const box=el('status');box.textContent=text;box.className=`info-box db-status show ${type||''}`}
+function setDbStatus(text,type){const box=el('dbStatus');box.className=`info-box db-status show ${type||''}`;el('dbStatusText').textContent=text}
+function activateStep(index){if(index>0&&!testedFingerprint)return;currentStep=index;document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.panel)!==index);document.querySelectorAll('[data-step]').forEach(button=>{const n=Number(button.dataset.step);button.classList.toggle('active',n===index);button.classList.toggle('complete',n<index);button.disabled=n>0&&!testedFingerprint});el('pageTitle').textContent=stepTitles[index][0];el('pageSubtitle').textContent=stepTitles[index][1];el('stepCount').textContent=`ขั้นตอน ${index+1} จาก 4`;el('progressFill').style.width=`${(index+1)*25}%`;if(index===3)updateSummary();window.scrollTo({top:0,behavior:'smooth'})}
+function updateSummary(){el('summaryDatabase').textContent=`${el('dbName').value.trim()||'ฐานข้อมูล'} · ${el('dbHost').value.trim()||'Host'}`;el('summaryHospital').textContent=el('hospitalName').value.trim()||'ยังไม่ระบุ'}
+async function request(url){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form())});const data=await response.json();if(!response.ok||!data.success){const error=new Error(data.error||'เกิดข้อผิดพลาด');error.data=data;throw error}return data}
+function showGrantDetails(details){const box=el('grantDetails');if(!details){box.hidden=true;return}box.hidden=false;el('grantIdentity').replaceChildren();const identity=details.identity||{};[['เชื่อมต่อมาจาก',identity.connected_user],['MariaDB account ที่ match',identity.authenticated_account],['Active role',details.activeRole]].forEach(([label,value])=>{const item=document.createElement('div');const title=document.createElement('small');title.textContent=label;const content=document.createElement('b');content.textContent=value||'ไม่พบข้อมูล';item.append(title,content);el('grantIdentity').append(item)});const list=el('grantLines');list.replaceChildren();(details.grants||[]).forEach(grant=>{const row=document.createElement('li');row.textContent=grant;list.append(row)});box.open=true}
+function showProvision(){const box=el('companionProvision');box.hidden=false;box.innerHTML='<div><strong>ติดตั้ง Companion บน workstation</strong><br>เปิดหน้า Install จากเครื่อง HOSxP แล้วดาวน์โหลดและเปิด Companion ระบบจะลงทะเบียนเครื่องให้อัตโนมัติ</div><a class="copy-token" href="/install/">เปิดหน้า Install</a><a class="copy-token" href="/setup/companion/">จัดการอุปกรณ์</a>';}
+document.querySelectorAll('[data-step]').forEach(button=>button.addEventListener('click',()=>activateStep(Number(button.dataset.step))));
+document.querySelectorAll('[data-next]').forEach(button=>button.addEventListener('click',()=>activateStep(Math.min(currentStep+1,3))));
+document.querySelectorAll('[data-back]').forEach(button=>button.addEventListener('click',()=>activateStep(Math.max(currentStep-1,0))));
+el('nextFromDb').addEventListener('click',()=>activateStep(1));
+dbFields.forEach(id=>el(id).addEventListener('input',()=>{if(testedFingerprint){testedFingerprint='';el('nextFromDb').disabled=true;document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=true});el('testHint').textContent='ข้อมูลฐานข้อมูลเปลี่ยนแล้ว กรุณาทดสอบใหม่';el('dbStatus').className='info-box db-status'}}));
+el('togglePassword').addEventListener('click',()=>{const input=el('dbPassword');input.type=input.type==='password'?'text':'password'});
+el('testButton').addEventListener('click',async()=>{const button=el('testButton');button.disabled=true;button.innerHTML='<span class="btn-icon">◌</span>กำลังตรวจสอบ...';showGrantDetails(null);try{if(!el('dbHost').value.trim()||!el('dbName').value.trim()||!el('dbUser').value.trim())throw new Error('กรอก Host, ชื่อฐานข้อมูล และบัญชีฐานข้อมูลให้ครบ');const data=await request('/api/setup/test-database');if(!data.readOnly)throw new Error('ระบบยืนยันสิทธิ์ SELECT-only ไม่ได้');testedFingerprint=fingerprint();el('nextFromDb').disabled=false;document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=false});el('testHint').textContent='เชื่อมต่อสำเร็จ · ขั้นตอนถัดไปพร้อมใช้งาน';setDbStatus(`เชื่อมต่อ ${data.database} สำเร็จ · account ที่ MariaDB จับคู่คือ ${data.identity?.authenticated_account||el('dbUser').value} · ยืนยัน SELECT-only แล้ว (สิทธิ์ SELECT ฐานอื่นยอมรับได้)`, 'success')}catch(error){testedFingerprint='';el('nextFromDb').disabled=true;setDbStatus(error.message,'error');showGrantDetails(error.data?.grantDetails)}finally{button.disabled=false;button.innerHTML='<span class="btn-icon">⌕</span>ทดสอบฐานข้อมูล'}});
+el('saveButton').addEventListener('click',async()=>{if(!testedFingerprint||fingerprint()!==testedFingerprint){setStatus('ฐานข้อมูลเปลี่ยนหลังทดสอบ กรุณากลับไปทดสอบใหม่ก่อนบันทึก','error');return}const button=el('saveButton');button.disabled=true;button.innerHTML='<span class="btn-icon">◌</span>กำลังบันทึก...';try{const data=await request('/api/setup/save');setStatus(data.message,'success');showProvision();el('saveHint').textContent='บันทึกการตั้งค่าเรียบร้อย';}catch(error){setStatus(error.message,'error')}finally{button.disabled=false;button.innerHTML='<span class="btn-icon">✓</span>บันทึกและเริ่มระบบ'}});
+fetch('/api/setup/status').then(response=>response.json()).then(({config})=>{if(!config)return;el('hospitalName').value=config.hospitalName||'';el('hospitalCode').value=config.hospitalCode||'';el('serverPort').value=config.port||3030;el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||['127.0.0.1','::1']).join(',');el('dbHost').value=config.hosxp?.host||'';el('dbPort').value=config.hosxp?.port||3306;el('dbName').value=config.hosxp?.database||'';el('dbUser').value=config.hosxp?.user||'';el('passwordHelp').textContent='เว้นว่างไว้เพื่อคงรหัสผ่านเดิม';el('creatinineLabCode').value=config.schema?.creatinineLabCode||'155';el('searchCharset').value=config.schema?.searchCharset||'tis620';const codes=config.schema?.labTrendCodes||{};el('labCodeLdl').value=(codes.ldl||[]).join(', ');el('labCodeHct').value=(codes.hct||[]).join(', ');el('labCodePlatelet').value=(codes.platelet||[]).join(', ');el('labCodeUacr').value=(codes.uacr||[]).join(', ');el('labCodeK').value=(codes.potassium||[]).join(', ');el('labCodeNa').value=(codes.sodium||[]).join(', ');el('labCodeBun').value=(codes.bun||[]).join(', ');el('labCodeAst').value=(codes.ast||[]).join(', ');el('labCodeAlt').value=(codes.alt||[]).join(', ');el('labCodeUric').value=(codes.uric||[]).join(', ')}).catch(()=>{});
+</script>
+</body>
+</html>

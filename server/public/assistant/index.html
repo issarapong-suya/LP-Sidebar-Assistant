@@ -4,11 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sidebar Doctor Assistant — ผู้ช่วยแพทย์ในหน้าจอทำงาน</title>
+  <link rel="icon" type="image/png" href="/doctor-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <!-- Bundled font for offline hospital networks -->
   <link rel="stylesheet" href="/fonts/prompt.css">
   <link rel="stylesheet" href="assistant.css">
 </head>
 <body>
+  <section id="sessionLockOverlay" class="session-lock-overlay" aria-labelledby="loginTitle">
+    <div class="session-lock-card">
+      <div class="session-lock-icon" aria-hidden="true">🔒</div>
+      <h1 id="loginTitle">เข้าสู่ระบบ Sidebar Doctor Assistant</h1>
+      <p id="sessionLockMessage">เข้าสู่ระบบด้วยบัญชี HOSxP ได้ แม้ไม่ได้เปิดโปรแกรม HOSxP</p>
+      <form id="hosxpLoginForm" class="hosxp-login-form" autocomplete="on">
+        <label for="loginUsername">ชื่อผู้ใช้ HOSxP</label>
+        <input id="loginUsername" name="username" type="text" maxlength="250" autocomplete="username" required>
+        <label for="loginPassword">รหัสผ่าน HOSxP</label>
+        <input id="loginPassword" name="password" type="password" maxlength="250" autocomplete="current-password" required>
+        <p id="loginError" class="login-error" role="alert" hidden></p>
+        <button id="loginSubmit" type="submit">เข้าสู่ระบบ</button>
+        <small class="login-privacy-note">ตรวจสอบกับบัญชีใน HOSxP โดยตรง ระบบไม่บันทึกรหัสผ่านที่กรอก</small>
+      </form>
+    </div>
+  </section>
 
   <!-- ─── Sidebar Header: สรุปสถานะคนไข้และเลขคิว ─── -->
   <header class="assistant-header">
@@ -24,10 +42,12 @@
           <span class="font-scale-text" id="fontScaleText">100%</span>
           <button type="button" class="btn-font-scale" id="btnFontUp" title="เพิ่มขนาดตัวอักษร">A+</button>
         </div>
+        <button type="button" class="btn-audio-toggle" id="btnAudioToggle" aria-pressed="true" title="เปิดเสียงแจ้งเตือนอัตโนมัติอยู่ — กดเพื่อปิด">🔊</button>
         <div class="sync-badge" id="syncStatusBadge" title="ระบบเชื่อมต่อ HOSxP แบบ Real-Time อัตโนมัติ">
           <span class="sync-dot"></span>
           <span id="syncStatusText">ซิงค์อัตโนมัติ</span>
         </div>
+        <button type="button" class="btn-session-logout" id="btnSessionLogout" hidden>ออกจากระบบ</button>
       </div>
     </div>
 
@@ -60,6 +80,11 @@
           <button class="btn-refresh" id="btnRefresh" title="กดเพื่อรีเฟรชข้อมูลล่าสุด">🔄</button>
         </div>
       </div>
+      <!-- CC (Chief Complaint / อาการสำคัญที่มาตรวจ) -->
+      <div class="patient-cc-row" id="patientCcRow" style="display: none;">
+        <span class="cc-badge" title="Chief Complaint (อาการสำคัญที่มาโรงพยาบาล)">CC</span>
+        <span class="cc-val" id="patientCcVal">-</span>
+      </div>
       <!-- Dropdown รายการ Visit ย้อนหลังของผู้ป่วยปัจจุบัน -->
       <div class="visit-dropdown-list" id="visitDropdownList" style="display: none;"></div>
 
@@ -77,9 +102,30 @@
 
   <!-- ─── Alert Toast Container: ป๊อปอัปแจ้งเตือนเวลาเปลี่ยนคนไข้ / ผลแล็บวิกฤต / เสนอยาสมุนไพร ─── -->
   <div class="toast-container" id="toastContainer"></div>
+  <div class="app-notice-region" id="appNoticeRegion" aria-live="polite" aria-atomic="true"></div>
 
   <!-- ─── เนื้อหาผู้ช่วยแพทย์ (Scrollable Body) ─── -->
   <main class="assistant-body">
+
+    <!-- ประวัติแพ้ยาอยู่ต้นหน้าจอเพื่อให้เห็นก่อนข้อมูลอื่น -->
+    <section class="allergy-banner allergy-unknown" id="allergyBanner" role="status" aria-live="polite" hidden>
+      <div class="allergy-banner-title"><span aria-hidden="true">⚠️</span><strong>ประวัติแพ้ยา</strong><span class="allergy-status-label" id="allergyStatusLabel">ยังไม่ทราบ</span></div>
+      <div class="allergy-banner-detail" id="allergyDetail">ยังไม่มีข้อมูลประวัติแพ้ยาในระบบ (ข้อมูลไม่ครบไม่ได้แปลว่าไม่มีประวัติแพ้ยา)</div>
+    </section>
+
+    <!-- แจ้งเตือนฉุกเฉิน: กลับมาตรวจซ้ำที่ห้องฉุกเฉิน (ER Revisit ภายใน 48 ชม.) -->
+    <section class="er-revisit-banner" id="erRevisitBanner" role="alert" style="display: none;">
+      <div class="er-revisit-head">
+        <span class="er-revisit-icon">🚨</span>
+        <div class="er-revisit-title-wrap">
+          <strong class="er-revisit-title">กลับมาตรวจซ้ำห้องฉุกเฉิน (ER Revisit ภายใน 48 ชม.)</strong>
+          <span class="er-hours-badge" id="erHoursBadge">- ชม. ที่แล้ว</span>
+        </div>
+      </div>
+      <div class="er-revisit-body" id="erRevisitBody">
+        <div class="er-revisit-detail" id="erRevisitDetail">-</div>
+      </div>
+    </section>
 
     <!-- 1. ไต & สัญญาณชีพ -->
     <section class="card-section" id="secRenal">
@@ -314,8 +360,7 @@
 
       <div class="history-modal-body" id="histModalBody">
         <!-- 1. ตารางประวัติ 10 ครั้ง -->
-        <div class="history-table-wrapper" id="wrapHistTable">
-          <!-- แถบ Toggle สลับเกณฑ์การประเมินค่าไต (HOSxP ทั่วไป vs สากล KDIGO) -->
+        <!-- แถบ Toggle สลับเกณฑ์การประเมินค่าไต (HOSxP ทั่วไป vs สากล KDIGO) -->
           <div class="hist-criteria-toggle-bar" id="renalCriteriaToggleBar" style="display: none;">
             <span class="criteria-toggle-label">เกณฑ์การแสดงผล:</span>
             <div class="toggle-pill-group">
@@ -327,7 +372,7 @@
           <!-- แถบ Quick Chips สลับรายการผลแล็บ (เมื่อเปิดดูประวัติแล็บ) -->
           <div class="lab-quick-chips" id="labQuickChips" style="display: none;">
             <span class="lab-chips-label">รายการแล็บ:</span>
-            <div class="toggle-pill-group" id="labChipGroup">
+            <div class="lab-chip-group" id="labChipGroup">
               <button type="button" class="btn-toggle-pill" data-lab="cbc">CBC</button>
               <button type="button" class="btn-toggle-pill" data-lab="potassium">Potassium (K)</button>
               <button type="button" class="btn-toggle-pill" data-lab="sodium">Sodium (Na)</button>
@@ -335,6 +380,10 @@
               <button type="button" class="btn-toggle-pill" data-lab="ast">SGOT</button>
               <button type="button" class="btn-toggle-pill" data-lab="alt">SGPT</button>
               <button type="button" class="btn-toggle-pill" data-lab="uric">Uric Acid</button>
+              <button type="button" class="btn-toggle-pill" data-lab="ldl">LDL</button>
+              <button type="button" class="btn-toggle-pill" data-lab="hct">Hct</button>
+              <button type="button" class="btn-toggle-pill" data-lab="platelet">Platelet</button>
+              <button type="button" class="btn-toggle-pill" data-lab="uacr">UACR</button>
             </div>
           </div>
 
@@ -355,6 +404,8 @@
             </div>
           </div>
 
+          <!-- 1. ตารางประวัติ 10 ครั้ง -->
+        <div class="history-table-wrapper" id="wrapHistTable">
           <table class="history-table" id="histTable">
             <thead id="histThead"></thead>
             <tbody id="histTbody">
@@ -412,6 +463,17 @@
 
   <!-- ─── Floating Tooltip Container สไตล์ Modern Slate ─── -->
   <div id="appFloatingTooltip" class="app-floating-tooltip"></div>
+
+  <footer class="privacy-footer"><button type="button" id="openPrivacyPolicy">นโยบายข้อมูลผู้ป่วย · PDPA</button><span id="footerBuild">Sidebar Doctor Assistant v1</span></footer>
+  <div class="privacy-modal" id="privacyPolicyModal" role="dialog" aria-modal="true" aria-labelledby="privacyPolicyTitle" hidden>
+    <div class="privacy-modal-card"><button type="button" id="closePrivacyPolicy" class="privacy-close" aria-label="ปิด">×</button>
+      <h2 id="privacyPolicyTitle">การใช้และดูแลข้อมูลในระบบนี้</h2>
+      <p>Sidebar Doctor Assistant อ่านข้อมูลจากฐาน HOSxP ด้วยบัญชีฐานข้อมูลที่กำหนดสิทธิ์อ่านอย่างเดียว เพื่อแสดงข้อมูลของผู้ป่วยที่เลือก เช่น ประวัติแพ้ยา ผลตรวจทางห้องปฏิบัติการ สัญญาณชีพ ยาที่ได้รับ และประวัติการรักษา รวมถึงคำนวณค่าประกอบการดูแล เช่น eGFR และ CrCl ข้อมูลนี้มีไว้ช่วยประกอบการพิจารณาของบุคลากรทางการแพทย์ ไม่ใช้แทนดุลยพินิจของผู้รักษา</p>
+      <p>เมื่อเข้าสู่ระบบโดยไม่เปิด HOSxP ระบบตรวจบัญชีผู้ใช้กับตาราง opduser ผ่าน passweb ข้อมูลรหัสผ่านที่กรอกใช้เพื่อตรวจสอบและไม่ถูกบันทึกเป็นข้อมูลบัญชีใน Sidebar เมื่อระบบพบ session จาก HOSxP/Companion จะออกจาก manual session และเปลี่ยนไปใช้ผู้ใช้กับคนไข้ที่เลือกใน HOSxP ผู้ใช้ควรออกจากระบบเมื่อเลิกใช้งาน และไม่ใช้บัญชีร่วมกัน</p>
+      <p>ระบบบันทึกเหตุการณ์เข้าใช้ ค้นหา เปิดดูข้อมูล และออกจากระบบ พร้อมบัญชีผู้ใช้ เครื่อง และ IP โดยแทน HN/VN ใน audit log ด้วยรหัสอ้างอิงที่ผ่าน HMAC ไฟล์ audit จัดเก็บใน SQLite บนเครื่อง Server และมี JSONL สำรองเมื่อ SQLite เขียนไม่ได้ ข้อมูลผู้ป่วยที่กำลังแสดงใช้ในหน่วยความจำระหว่างทำงาน ระบบนี้ไม่ส่งข้อมูลให้ AI หรือบริการภายนอก</p>
+      <p>การเชื่อมต่อจากเครื่องอื่นต้องใช้ HTTPS ผู้ดูแลระบบโรงพยาบาลเป็นผู้กำหนดสิทธิ์เข้าถึงระบบ การสำรอง และระยะเวลาเก็บ audit log ให้สอดคล้องกับนโยบายของโรงพยาบาล หากพบการใช้ข้อมูลผิดวัตถุประสงค์ โปรดแจ้งผู้ดูแลระบบหรือเจ้าหน้าที่คุ้มครองข้อมูลของโรงพยาบาล</p>
+    </div>
+  </div>
 
   <script src="assistant.js"></script>
 </body>

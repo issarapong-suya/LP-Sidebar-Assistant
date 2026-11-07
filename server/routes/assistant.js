@@ -1,26 +1,37 @@
 'use strict';
 
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const { getPool, getConfig } = require('../db');
+const auditLog = require('../audit-log');
 const router = express.Router();
 const activePatients = new Map();
-const AUDIT_PATH = path.join(__dirname, '..', 'data', 'access.jsonl');
+const loginAttempts = new Map();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 5;
 
 function clientIp(req) {
+  const resolveIp = req.app?.get('requestClientIp');
+  if (typeof resolveIp === 'function') return resolveIp(req);
   let ip = String(req.ip || req.socket?.remoteAddress || '').split(',')[0].trim();
   if (ip.startsWith('::ffff:')) ip = ip.slice(7);
   if (ip === '::1') ip = '127.0.0.1';
   return ip;
 }
 
+function isExplicitNoAllergy(value) {
+  const text = String(value || '').normalize('NFKC').toLowerCase().replace(/[\s\u200b\uFEFF]+/g, '');
+  return /^(?:ปฏิเสธ|ปฎิเสธ)(?:การ)?แพ้/.test(text)
+    || /^(?:ไม่มีประวัติแพ้ยา|ไม่เคยแพ้ยา|ไม่มี|ไม่แพ้ยา|n\/?a|none|n|no)(?:$|[\/,;|])/.test(text);
+}
+
 function audit(req, action, patient = {}) {
-  const record = {
-    at: new Date().toISOString(), action, hn: String(patient.hn || ''),
-    vn: String(patient.vn || ''), ip: clientIp(req), computer: String(req.query.computer || '')
-  };
-  fs.appendFile(AUDIT_PATH, `${JSON.stringify(record)}\n`, () => {});
+  const session = req.assistantSession || {};
+  return auditLog.record({
+    requestId: req.requestId, action, actor: session.user || '',
+    workstation: session.computer || req.get('x-workstation') || '', clientIp: clientIp(req),
+    resourceType: patient.vn ? 'visit' : patient.hn ? 'patient' : '',
+    resourceRef: patient.vn || patient.hn || '', outcome: 'success'
+  });
 }
 
 function thaiDate(value) {
@@ -50,10 +61,82 @@ function egfr2021(creatinine, age, sex) {
   return 142 * Math.pow(Math.min(cr / k, 1), alpha) * Math.pow(Math.max(cr / k, 1), -1.2) * Math.pow(0.9938, years) * (female ? 1.012 : 1);
 }
 
+function loginRateState(ip, now = Date.now()) {
+  let state = loginAttempts.get(ip);
+  if (!state || now - state.windowStartedAt >= LOGIN_WINDOW_MS) {
+    state = { failures: 0, windowStartedAt: now, blockedUntil: 0 };
+    loginAttempts.set(ip, state);
+  }
+  return state;
+}
+
+router.post('/auth/login', async (req, res) => {
+  const ip = clientIp(req);
+  const state = loginRateState(ip);
+  if (state.blockedUntil > Date.now()) {
+    auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGIN_RATE_LIMITED', clientIp: ip, outcome: 'denied' });
+    return res.status(429).json({ success: false, error: 'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่' });
+  }
+  if (!req.app.get('requestIsSecure')(req) && ip !== '127.0.0.1') {
+    return res.status(426).json({ success: false, error: 'การเข้าสู่ระบบจากเครื่องอื่นต้องใช้ HTTPS เพื่อปกป้องรหัสผ่าน' });
+  }
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '');
+  if (!username || !password || username.length > 250 || password.length > 250) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
+  }
+
+  try {
+    const db = getPool();
+    // The site's passweb sample is 32 hex characters, and MD5 is used by some HOSxP-related web integrations.
+    // Compare inside MariaDB with a prepared parameter; never select or return the stored hash.
+    const [rows] = await db.execute(`SELECT loginname,name,account_disable FROM opduser
+      WHERE loginname=? AND passweb IS NOT NULL AND LOWER(passweb)=LOWER(MD5(?)) LIMIT 1`, [username, password]);
+    const account = rows[0];
+    const disabled = account && ['Y', '1'].includes(String(account.account_disable || '').trim().toUpperCase());
+    if (!account || disabled) {
+      state.failures += 1;
+      if (state.failures >= LOGIN_MAX_FAILURES) state.blockedUntil = Date.now() + LOGIN_WINDOW_MS;
+      auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGIN_FAILED', clientIp: ip, outcome: 'denied' });
+      return res.status(401).json({ success: false, error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชีถูกระงับ' });
+    }
+
+    state.failures = 0;
+    state.blockedUntil = 0;
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const sessions = req.app.get('manualSessions');
+    const now = Date.now();
+    sessions.set(token, { user: String(account.loginname), displayName: String(account.name || account.loginname), createdAt: now, lastActivity: now });
+    req.app.get('setSessionCookie')(res, token, req);
+    auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGIN', actor: String(account.loginname), clientIp: ip, outcome: 'success' });
+    return res.json({ success: true, user: String(account.loginname), displayName: String(account.name || account.loginname) });
+  } catch (_) {
+    // Keep DB diagnostics and submitted credentials out of the response and routine logs.
+    auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGIN_ERROR', clientIp: ip, outcome: 'error' });
+    return res.status(503).json({ success: false, error: 'ตรวจสอบบัญชีไม่ได้ กรุณาตรวจการเชื่อมต่อฐานข้อมูลหรือสิทธิ์อ่านตาราง opduser' });
+  }
+});
+
+router.post('/auth/logout', (req, res) => {
+  const session = req.app.get('clearManualSession')(req, res);
+  if (session) auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGOUT', actor: session.user, clientIp: clientIp(req), outcome: 'success' });
+  res.json({ success: true });
+});
+
 router.get('/sync-patient', (req, res) => {
   const ip = clientIp(req);
   const state = activePatients.get(ip) || (ip === '127.0.0.1' ? activePatients.get('127.0.0.1') : null);
-  const alive = state && Date.now() - state.timestamp < 25000;
+  const alive = state && state.session_active && Date.now() - state.timestamp < 15000;
+  let manual = null;
+  if (alive) {
+    manual = req.app.get('clearManualSession')(req, res);
+    if (manual) auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_SESSION_REPLACED_BY_COMPANION', actor: manual.user, workstation: state.computer, clientIp: ip, outcome: 'success' });
+  } else {
+    manual = req.app.get('getManualSession')(req, false);
+  }
+  if (manual) {
+    return res.json({ vn: null, hn: null, user: manual.displayName || manual.user, live_diag: '', last_click_id: 0, last_click_vn: '', isLive: false, sessionActive: true, authMode: 'manual', timestamp: Date.now() });
+  }
   res.json({
     vn: alive ? state.vn || null : null,
     hn: alive ? state.hn || null : null,
@@ -61,7 +144,9 @@ router.get('/sync-patient', (req, res) => {
     live_diag: alive ? state.live_diag || '' : '',
     last_click_id: state?.last_click_id || 0,
     last_click_vn: state?.last_click_vn || '',
-    isLive: !!alive,
+    isLive: !!(alive && state.vn),
+    sessionActive: !!alive,
+    authMode: alive ? 'companion' : '',
     timestamp: Date.now()
   });
 });
@@ -69,17 +154,32 @@ router.get('/sync-patient', (req, res) => {
 router.post('/notify-patient', express.json({ limit: '32kb' }), (req, res) => {
   const body = req.body || {};
   const ip = clientIp(req);
+  const providedToken = String(req.get('x-companion-token') || '');
+  const companionAuth = req.app.get('authenticateCompanionToken')(providedToken);
+  if (!companionAuth.valid) {
+    auditLog.record({ requestId: req.requestId, action: 'COMPANION_HEARTBEAT_REJECTED', clientIp: ip, outcome: 'denied' });
+    return res.status(401).json({ success: false, error: 'Companion ไม่ได้รับอนุญาต' });
+  }
+  const sessionActive = body.session_active === true && Boolean(String(body.user || '').trim());
   const previous = activePatients.get(ip) || {};
   const isClick = body.trigger === 'click' || body.click_id;
   const state = {
-    vn: String(body.vn || ''), hn: String(body.hn || ''), user: String(body.user || ''),
+    vn: sessionActive ? String(body.vn || '') : '', hn: sessionActive ? String(body.hn || '') : '', user: sessionActive ? String(body.user || '').slice(0, 100) : '',
     live_diag: String(body.live_diag || previous.live_diag || ''),
+    computer: String(companionAuth.deviceName || body.computer || '').slice(0, 100), device_id: companionAuth.deviceId || '', session_active: sessionActive,
     last_click_id: Number(body.click_id) || (isClick ? Date.now() : previous.last_click_id || 0),
     last_click_vn: isClick ? String(body.vn || '') : previous.last_click_vn || '',
     timestamp: Date.now()
   };
+  const sessionChanged = Boolean(previous.session_active) !== sessionActive || (sessionActive && previous.user !== state.user);
+  const patientChanged = (previous.vn || '') !== state.vn || (previous.hn || '') !== state.hn;
   activePatients.set(ip, state);
+  const sessions = req.app.get('companionSessions');
+  if (sessionActive) sessions.set(ip, { active: true, user: state.user, computer: state.computer, deviceId: state.device_id, timestamp: state.timestamp });
+  else sessions.delete(ip);
   if (ip === '127.0.0.1') activePatients.set('127.0.0.1', state);
+  if (sessionChanged) auditLog.record({ requestId: req.requestId, action: sessionActive ? 'HOSXP_SESSION_STARTED' : 'HOSXP_SESSION_ENDED', actor: state.user || previous.user, workstation: state.computer, clientIp: ip, outcome: 'success' });
+  if (patientChanged && (previous.vn || previous.hn || state.vn || state.hn)) auditLog.record({ requestId: req.requestId, action: state.vn || state.hn ? 'PATIENT_CONTEXT_SELECTED' : 'PATIENT_CONTEXT_CLEARED', actor: state.user || previous.user, workstation: state.computer || previous.computer, clientIp: ip, resourceType: state.vn || previous.vn ? 'visit' : 'patient', resourceRef: state.vn || previous.vn || state.hn || previous.hn, outcome: 'success' });
   res.json({ success: true, vn: state.vn, timestamp: state.timestamp, last_click_id: state.last_click_id });
 });
 
@@ -115,6 +215,49 @@ router.get('/visit-data/:vn', async (req, res) => {
     ]);
     const patient = patients[0] || {};
     const screening = screens[0] || {};
+    let allergyRows = [];
+    try {
+      const [allergyColumns] = await db.execute(`SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='opd_allergy'`);
+      const available = new Set(allergyColumns.map(column => String(column.COLUMN_NAME).toLowerCase()));
+      if (available.has('hn') && available.has('agent')) {
+        const fields = ['agent'];
+        for (const optional of ['symptom', 'report_date', 'seriousness_id']) {
+          if (available.has(optional)) fields.push(optional);
+        }
+        const orderBy = available.has('report_date') ? 'ORDER BY report_date DESC' : '';
+        const [rows] = await db.execute(`SELECT ${fields.join(',')} FROM opd_allergy WHERE hn=? ${orderBy}`, [visit.hn]);
+        allergyRows = rows.map(row => ({
+          agent: String(row.agent || '').trim(),
+          symptom: String(row.symptom || '').trim(),
+          report_date: row.report_date || null,
+          severity: row.seriousness_id ?? null
+        })).filter(row => row.agent || row.symptom);
+      }
+    } catch (allergyError) {
+      console.warn('[assistant] allergy history unavailable:', allergyError.code || allergyError.name || 'error');
+    }
+    const fallbackAllergy = String(patient.drugallergy || '').trim();
+    const screeningAllergy = String(screening.found_allergy || '').trim();
+    // HOSxP may store a refusal/no-known-allergy statement in opd_allergy.agent.
+    // Such a row is not a positive allergen and must not trigger the red warning.
+    const negativeAllergyRows = allergyRows.filter(row =>
+      isExplicitNoAllergy(row.agent) || (!row.agent && isExplicitNoAllergy(row.symptom))
+    );
+    const positiveAllergyRows = allergyRows.filter(row => !negativeAllergyRows.includes(row));
+    const fallbackSaysNoAllergy = isExplicitNoAllergy(fallbackAllergy);
+    const screeningSaysNoAllergy = isExplicitNoAllergy(screeningAllergy);
+    const fallbackHasAllergyText = Boolean(fallbackAllergy && !fallbackSaysNoAllergy);
+    const allergyStatus = positiveAllergyRows.length || fallbackHasAllergyText
+      ? 'recorded'
+      : (negativeAllergyRows.length || fallbackSaysNoAllergy || screeningSaysNoAllergy ? 'none' : 'unknown');
+    const negativeAllergyText = negativeAllergyRows
+      .map(row => [row.agent, row.symptom].filter(Boolean).join(': '))
+      .filter(Boolean)
+      .join(' · ');
+    const allergyText = positiveAllergyRows.length
+      ? positiveAllergyRows.map(row => [row.agent, row.symptom].filter(Boolean).join(': ')).join(' · ')
+      : (fallbackHasAllergyText ? fallbackAllergy : negativeAllergyText || (fallbackSaysNoAllergy ? fallbackAllergy : screeningAllergy));
     const age = Number(stats[0]?.age_y ?? patient.age ?? 0);
     const [creatinineRows] = await db.execute(`SELECT lo.lab_order_result FROM lab_head lh
       JOIN lab_order lo ON lo.lab_order_number=lh.lab_order_number
@@ -143,17 +286,62 @@ router.get('/visit-data/:vn', async (req, res) => {
         FROM oapp a LEFT JOIN ovst o ON o.vn=a.vn WHERE a.vn=? ORDER BY a.oapp_id DESC LIMIT 1`, [vn]);
       if (apps[0]) appointment = { ...apps[0], nextdate_thai: thaiDate(apps[0].nextdate), nexttime: String(apps[0].nexttime || '08:00').slice(0,5), clinic_name: apps[0].clinic || 'คลินิกผู้ป่วยนอก' };
     } catch (_) { /* Some HOSxP deployments do not grant access to appointment tables. */ }
+
+    let erRevisit48h = null;
+    try {
+      const [erRows] = await db.execute(`
+        SELECT o.vn, o.hn, DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate, o.vsttime,
+               IFNULL(k.department, 'อุบัติเหตุ ฉุกเฉินER') AS department_name,
+               IFNULL(o.diag_text, '') AS diag_text,
+               IFNULL(s.cc, '') AS cc,
+               IFNULL(d.name, '') AS doctor_name,
+               TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), NOW()) AS hours_ago
+        FROM ovst o
+        LEFT JOIN kskdepartment k ON o.main_dep = k.depcode
+        LEFT JOIN opdscreen s ON o.vn = s.vn
+        LEFT JOIN doctor d ON o.doctor = d.code
+        WHERE o.hn = ?
+          AND o.vn != ?
+          AND (k.department LIKE '%ฉุกเฉิน%' OR k.department LIKE '%ER%' OR o.main_dep = '003' OR o.cur_dep = '003')
+          AND TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), NOW()) BETWEEN 0 AND 48
+        ORDER BY o.vstdate DESC, o.vsttime DESC
+        LIMIT 1
+      `, [visit.hn, vn]);
+      if (erRows[0]) {
+        const er = erRows[0];
+        erRevisit48h = {
+          hasRevisit: true,
+          vn: String(er.vn),
+          vstdate: er.vstdate,
+          vstdate_thai: thaiDate(er.vstdate),
+          vsttime: er.vsttime ? String(er.vsttime).slice(0, 5) : '',
+          hoursAgo: Math.max(0, Number(er.hours_ago) || 0),
+          department: String(er.department_name || 'ห้องฉุกเฉิน'),
+          diag: String(er.diag_text || ''),
+          cc: String(er.cc || ''),
+          doctor: String(er.doctor_name || '')
+        };
+      }
+    } catch (erErr) {
+      console.warn('[assistant] ER revisit check error:', erErr.code || erErr.name || 'error');
+    }
+
     const payload = {
       success: true,
       visit: { ...visit, vstdate_thai: thaiDateFull(visit.vstdate), appointment, is_on_warfarin: /warfarin/i.test(`${patient.drugallergy || ''} ${screening.pmh || ''} ${medications.map(m => m.name).join(' ')}`) },
       patient: { ...patient, hn: visit.hn, age, age_y: age, age_text: age ? `${age} ปี ${stats[0]?.age_m ? `${stats[0].age_m} เดือน` : ''}`.trim() : '', sex: String(patient.sex) === '1' ? 'ชาย' : String(patient.sex) === '2' ? 'หญิง' : 'ไม่ระบุ' },
+      allergyStatus,
+      allergies: positiveAllergyRows,
+      allergyText,
+      erRevisit48h,
       screening: { ...screening, cr: creatinine ? creatinine.toFixed(2) : '0', egfr: egfr ? egfr.toFixed(1) : '0', crcl: crcl ? crcl.toFixed(1) : '', stage: egfr >= 90 ? '1' : egfr >= 60 ? '2' : egfr >= 30 ? '3' : egfr >= 15 ? '4' : egfr ? '5' : '-' },
       diagnoses: diagnosesOut, medications, labResults
     };
-    audit(req, 'ASSISTANT_VISIT', { hn: visit.hn, vn });
+    if (!audit(req, 'ASSISTANT_VISIT', { hn: visit.hn, vn })) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม จึงระงับการส่งข้อมูลผู้ป่วยชั่วคราว' });
     res.json(payload);
   } catch (error) {
-    console.error('[assistant] visit-data:', error.message);
+    auditLog.record({ requestId: req.requestId, action: 'ASSISTANT_VISIT', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), resourceType: 'visit', resourceRef: vn, outcome: 'error' });
+    console.error('[assistant] visit-data failed:', error.code || error.name || 'error');
     res.status(500).json({ success: false, error: 'อ่านข้อมูล Visit ไม่สำเร็จ ตรวจสอบ schema และสิทธิ์ฐานข้อมูล HOSxP' });
   }
 });
@@ -209,22 +397,33 @@ router.get('/search', async (req, res) => {
           vstdate DESC
         LIMIT ?`, [qHex, qHex, qHex, qHex, qHex, firstTermHex, lastTermHex, qHex, firstTermHex, lastTermHex, limit]);
     }
-    audit(req, 'ASSISTANT_SEARCH');
+    if (!audit(req, 'ASSISTANT_SEARCH')) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม จึงระงับการค้นหาชั่วคราว', results: [] });
     res.json({ success: true, total: rows.length, patient: rows[0] || null, vn: rows[0]?.vn || null, results: rows.map(row => ({ ...row, vstdate_formatted: row.vstdate || '' })) });
   } catch (error) {
-    console.error('[assistant] search:', error.message);
+    auditLog.record({ requestId: req.requestId, action: 'ASSISTANT_SEARCH', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), outcome: 'error' });
+    console.error('[assistant] search failed:', error.code || error.name || 'error');
     res.status(500).json({ success: false, error: 'ค้นหาผู้ป่วยไม่สำเร็จ ตรวจสอบ schema และสิทธิ์ฐานข้อมูล HOSxP', results: [] });
   }
 });
 
 router.get('/patient-vitals-history/:hn', async (req, res) => {
   const hn = String(req.params.hn || '');
+  const vitalsType = String(req.query.type || '').toLowerCase();
+  const filters = {
+    bp: '(s.bps>0 OR s.bpd>0 OR s.pulse>0)',
+    bw: '(s.bw>0 OR s.height>0 OR s.bmi>0)',
+    temperature: 's.temperature>0',
+    fbs: 's.fbs>0'
+  };
+  const valueFilter = filters[vitalsType] || '(s.bps>0 OR s.bpd>0 OR s.pulse>0 OR s.bw>0 OR s.height>0 OR s.bmi>0 OR s.temperature>0 OR s.fbs>0)';
   try {
     const [rows] = await getPool().execute(`SELECT DATE_FORMAT(o.vstdate,'%Y-%m-%d') AS vstdate,o.vsttime,s.bps,s.bpd,s.pulse,s.bw,s.height,s.bmi,s.temperature,s.fbs
-      FROM opdscreen s JOIN ovst o ON o.vn=s.vn WHERE o.hn=? AND (s.bps>0 OR s.bpd>0 OR s.pulse>0)
+      FROM opdscreen s JOIN ovst o ON o.vn=s.vn WHERE o.hn=?
+        AND ${valueFilter}
       ORDER BY o.vstdate DESC,o.vsttime DESC LIMIT ${capLimit(req.query.limit)}`, [hn]);
+    if (!audit(req, 'PATIENT_VITALS_HISTORY', { hn })) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม', data: [] });
     res.json({ success: true, hn, count: rows.length, data: rows.map(row => ({ ...row, vstdate_thai: thaiDate(row.vstdate) })) });
-  } catch (error) { res.status(500).json({ success: false, error: 'อ่านประวัติสัญญาณชีพไม่สำเร็จ', data: [] }); }
+  } catch (error) { auditLog.record({ requestId: req.requestId, action: 'PATIENT_VITALS_HISTORY', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), resourceType: 'patient', resourceRef: hn, outcome: 'error' }); res.status(500).json({ success: false, error: 'อ่านประวัติสัญญาณชีพไม่สำเร็จ', data: [] }); }
 });
 
 router.get('/patient-lab-history/:hn', async (req, res) => {
@@ -235,17 +434,23 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
     creatinine: "(li.lab_items_name LIKE '%Creatinine%' OR li.lab_items_name LIKE '%eGFR%' OR li.lab_items_name LIKE '%ClCr%')",
     hba1c: "(li.lab_items_name LIKE '%HbA1c%' OR li.lab_items_name LIKE '%A1C%')",
     fbs: "(li.lab_items_name LIKE '%FBS%' OR li.lab_items_name LIKE '%Glucose%' OR li.lab_items_name LIKE '%FPG%')",
+    ldl: "(li.lab_items_name LIKE '%LDL%' OR li.lab_items_name LIKE '%Low density%')",
+    hct: "(li.lab_items_name LIKE '%Hematocrit%' OR li.lab_items_name LIKE '%Hct%')",
+    uacr: "(li.lab_items_name LIKE '%UACR%' OR li.lab_items_name LIKE '%Albumin Creatinine Ratio%' OR li.lab_items_name LIKE '%Urine ACR%')",
     k: "(li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%')",
     na: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
     bun: "li.lab_items_name LIKE '%BUN%'", uric: "li.lab_items_name LIKE '%Uric%'",
     ast: "(li.lab_items_name LIKE '%SGOT%' OR li.lab_items_name LIKE '%AST%')",
     alt: "(li.lab_items_name LIKE '%SGPT%' OR li.lab_items_name LIKE '%ALT%')",
     wbc: "(li.lab_items_name LIKE '%WBC%' OR li.lab_items_name LIKE '%White Blood%')",
-    platelet: "li.lab_items_name LIKE '%Platelet%'"
+    platelet: "(li.lab_items_name LIKE '%Platelet%' OR li.lab_items_name LIKE '%Plt%')"
   };
-  const where = matches[type] || 'li.lab_items_name LIKE ?';
+  const configuredCodes = getConfig()?.schema?.labTrendCodes?.[type];
+  const codeList = Array.isArray(configuredCodes) ? configuredCodes.map(code => String(code).trim()).filter(code => /^[A-Za-z0-9._-]{1,30}$/.test(code)).slice(0, 20) : [];
+  const where = codeList.length ? `lo.lab_items_code IN (${codeList.map(() => '?').join(',')})` : (matches[type] || 'li.lab_items_name LIKE ?');
   const params = [hn];
-  if (!matches[type]) params.push(`%${type}%`);
+  if (codeList.length) params.push(...codeList);
+  else if (!matches[type]) params.push(`%${type}%`);
   try {
     const [rows] = await getPool().execute(`SELECT DATE_FORMAT(lh.order_date,'%Y-%m-%d') AS order_date,lh.order_time,lo.lab_items_code,
       li.lab_items_name,li.lab_items_unit,lo.lab_order_result,lo.abnormal_result,lo.critical_result,
@@ -253,8 +458,9 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
       FROM lab_order lo JOIN lab_head lh ON lo.lab_order_number=lh.lab_order_number
       LEFT JOIN lab_items li ON li.lab_items_code=lo.lab_items_code WHERE lh.hn=? AND ${where}
       ORDER BY lh.order_date DESC,lh.order_time DESC LIMIT ${capLimit(req.query.limit)}`, params);
+    if (!audit(req, 'PATIENT_LAB_HISTORY', { hn })) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม', data: [] });
     res.json({ success: true, hn, itemType: type, count: rows.length, data: rows.map(row => ({ ...row, order_date_thai: thaiDate(row.order_date) })) });
-  } catch (error) { res.status(500).json({ success: false, error: 'อ่านประวัติผลแล็บไม่สำเร็จ', data: [] }); }
+  } catch (error) { auditLog.record({ requestId: req.requestId, action: 'PATIENT_LAB_HISTORY', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), resourceType: 'patient', resourceRef: hn, outcome: 'error' }); res.status(500).json({ success: false, error: 'อ่านประวัติผลแล็บไม่สำเร็จ', data: [] }); }
 });
 
 router.get('/patient-visits/:hn', async (req, res) => {
@@ -264,8 +470,9 @@ router.get('/patient-visits/:hn', async (req, res) => {
       FROM ovst o LEFT JOIN kskdepartment k ON o.main_dep=k.depcode LEFT JOIN doctor d ON o.doctor=d.code
       LEFT JOIN opdscreen s ON o.vn=s.vn WHERE o.hn=? ORDER BY o.vstdate DESC,o.vsttime DESC,o.vn DESC LIMIT ${capLimit(req.query.limit, 12)}`,
     [String(req.params.hn)]);
+    if (!audit(req, 'PATIENT_VISIT_HISTORY', { hn: req.params.hn })) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม', visits: [] });
     res.json({ success: true, hn: req.params.hn, count: rows.length, visits: rows.map(row => ({ ...row, vstdate_thai: thaiDate(row.vstdate) })) });
-  } catch (error) { res.status(500).json({ success: false, error: 'อ่านรายการ Visit ไม่สำเร็จ', visits: [] }); }
+  } catch (error) { auditLog.record({ requestId: req.requestId, action: 'PATIENT_VISIT_HISTORY', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), resourceType: 'patient', resourceRef: req.params.hn, outcome: 'error' }); res.status(500).json({ success: false, error: 'อ่านรายการ Visit ไม่สำเร็จ', visits: [] }); }
 });
 
 module.exports = router;

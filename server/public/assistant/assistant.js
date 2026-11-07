@@ -29,6 +29,45 @@ let pollTimer = null;
 let selectedDays = 28;
 let activeToastTimeout = null;
 let searchDebounceTimer = null;
+let sharedAudioContext = null;
+let audioEnabled = true;
+let assistantSessionActive = false;
+let lastSessionHeartbeatAt = 0;
+let assistantAuthMode = '';
+
+function setAssistantSessionActive(active, user = '', authMode = '') {
+  const wasActive = assistantSessionActive;
+  const previousAuthMode = assistantAuthMode;
+  const locked = !active;
+  assistantSessionActive = !!active;
+  assistantAuthMode = active ? authMode : '';
+  document.body.classList.toggle('session-locked', locked);
+  const overlay = document.getElementById('sessionLockOverlay');
+  const message = document.getElementById('sessionLockMessage');
+  if (message) message.textContent = locked ? 'เข้าสู่ระบบด้วยบัญชี HOSxP ได้ แม้ไม่ได้เปิดโปรแกรม HOSxP' : (authMode === 'manual' ? `เข้าสู่ระบบแล้ว · ${user}` : `ตรวจพบ session HOSxP · ${user}`);
+  const logoutButton = document.getElementById('btnSessionLogout');
+  if (logoutButton) logoutButton.hidden = !(active && authMode === 'manual');
+  if (locked) {
+    currentVn = null; currentHn = null; currentPatientName = ''; currentPatientData = null; currentPatientMeds = [];
+    currentLiveDiag = ''; lastHosxpVn = null; isManualSearchActive = false;
+    const name = document.getElementById('patientName'); if (name) name.textContent = 'รอคนไข้จาก HOSxP...';
+    const hn = document.getElementById('patientHnBadge'); if (hn) hn.textContent = 'HN -';
+    const vn = document.getElementById('patientVn'); if (vn) vn.textContent = '-';
+    const ccRow = document.getElementById('patientCcRow'); if (ccRow) ccRow.style.display = 'none';
+    const erBanner = document.getElementById('erRevisitBanner'); if (erBanner) erBanner.style.display = 'none';
+    const allergy = document.getElementById('allergyBanner'); if (allergy) allergy.hidden = true;
+  }
+  if (overlay) overlay.hidden = !locked;
+  if (wasActive && active && previousAuthMode === 'manual' && authMode === 'companion') {
+    // The server has revoked the direct-login cookie. Reload to remove any patient
+    // details opened during manual mode before syncing the HOSxP-selected patient.
+    window.location.reload();
+    return;
+  }
+  // Discard the previous page DOM and any still-rendered clinical data as soon as
+  // the server reports that the active HOSxP session has ended or expired.
+  if (wasActive && locked) window.location.reload();
+}
 
 let lastHosxpVn = null;
 let lastHandledClickId = 0;
@@ -452,6 +491,48 @@ const HERB_DATABASE = {
 
 // ─── 1. เริ่มต้นระบบและดักจับพารามิเตอร์ ───
 document.addEventListener('DOMContentLoaded', () => {
+  document.body.classList.add('session-locked');
+  fetch('/api/version').then(response => response.json()).then(info => {
+    const node = document.getElementById('footerBuild');
+    if (node) node.textContent = `Sidebar Doctor Assistant · v${info.version} · build ${info.build}`;
+  }).catch(() => {});
+  document.getElementById('openPrivacyPolicy')?.addEventListener('click', () => { document.getElementById('privacyPolicyModal').hidden = false; });
+  document.getElementById('closePrivacyPolicy')?.addEventListener('click', () => { document.getElementById('privacyPolicyModal').hidden = true; });
+  document.getElementById('privacyPolicyModal')?.addEventListener('click', event => { if (event.target.id === 'privacyPolicyModal') event.currentTarget.hidden = true; });
+  document.getElementById('hosxpLoginForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const usernameInput = document.getElementById('loginUsername');
+    const passwordInput = document.getElementById('loginPassword');
+    const errorNode = document.getElementById('loginError');
+    const submit = document.getElementById('loginSubmit');
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    errorNode.hidden = true;
+    submit.disabled = true;
+    submit.textContent = 'กำลังตรวจสอบ...';
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      passwordInput.value = '';
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || 'เข้าสู่ระบบไม่สำเร็จ');
+      await checkActiveSessionOnce();
+    } catch (error) {
+      passwordInput.value = '';
+      errorNode.textContent = error.message || 'เข้าสู่ระบบไม่สำเร็จ';
+      errorNode.hidden = false;
+      passwordInput.focus();
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'เข้าสู่ระบบ';
+    }
+  });
+  document.getElementById('btnSessionLogout')?.addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { setAssistantSessionActive(false); }
+  });
+  setupAudioAlerts();
   const urlParams = new URLSearchParams(window.location.search);
   const qVn = urlParams.get('vn');
   const qHn = urlParams.get('hn');
@@ -548,9 +629,16 @@ function startActiveSessionPolling() {
 async function checkActiveSessionOnce() {
   try {
     const res = await fetch('/api/sync-patient');
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (assistantSessionActive) setAssistantSessionActive(false);
+      return;
+    }
     const data = await res.json();
     if (!data) return;
+    if (data.sessionActive) lastSessionHeartbeatAt = Date.now();
+    setAssistantSessionActive(Boolean(data.sessionActive), data.user || '', data.authMode || '');
+    if (!data.sessionActive) { setSyncState(false, 'รอ HOSxP'); return; }
+    if (data.authMode === 'manual') { setSyncState(true, 'เข้าสู่ระบบแล้ว'); return; }
 
     // 1. ตรวจจับการกดไอคอนพี่หมอบน HOSxP โดยตรง (Event-driven Click Tracking)
     const isIconClick = (data.last_click_id && data.last_click_id > lastHandledClickId);
@@ -595,12 +683,15 @@ async function checkActiveSessionOnce() {
     }
   } catch (err) {
     // ออฟไลน์
+    if (assistantSessionActive && Date.now() - lastSessionHeartbeatAt > 15000) setAssistantSessionActive(false);
   }
 }
 
 // ─── 3. โหลดข้อมูลคลินิกและผลแล็บจาก Server ───
 async function loadPatientData(vn, hn) {
   if (!vn) return;
+  const allergyBanner = document.getElementById('allergyBanner');
+  if (allergyBanner) allergyBanner.hidden = true;
   const isChanged = (currentVn !== vn);
   currentVn = vn;
   currentHn = hn || null;
@@ -612,6 +703,7 @@ async function loadPatientData(vn, hn) {
 
   try {
     const res = await fetch(`/api/assistant/visit-data/${encodeURIComponent(vn)}`);
+    if (res.status === 423) { setAssistantSessionActive(false); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -707,6 +799,61 @@ function renderAssistant(d, isChanged = false) {
   }
 
   document.getElementById('patientVn').textContent = visit.vn || currentVn;
+
+  // แสดง Chief Complaint (CC / อาการสำคัญที่มาตรวจ)
+  const ccRow = document.getElementById('patientCcRow');
+  const ccVal = document.getElementById('patientCcVal');
+  const ccText = (screening.cc || '').trim();
+  if (ccRow && ccVal) {
+    if (ccText) {
+      ccRow.style.display = 'flex';
+      ccVal.textContent = ccText;
+    } else {
+      ccRow.style.display = 'none';
+    }
+  }
+
+  // แสดงประวัติแพ้ยาให้เห็นก่อนข้อมูลสุขภาพส่วนอื่น
+  const allergyBanner = document.getElementById('allergyBanner');
+  const allergyStatusLabel = document.getElementById('allergyStatusLabel');
+  const allergyDetail = document.getElementById('allergyDetail');
+  if (allergyBanner && allergyStatusLabel && allergyDetail) {
+    allergyBanner.hidden = false;
+    const allergyStatus = d.allergyStatus || 'unknown';
+    allergyBanner.classList.remove('allergy-recorded', 'allergy-none', 'allergy-unknown');
+    if (allergyStatus === 'recorded') {
+      allergyBanner.classList.add('allergy-recorded');
+      allergyStatusLabel.textContent = 'พบประวัติ';
+      allergyDetail.textContent = d.allergyText || patient.drugallergy || 'พบประวัติแพ้ยา โปรดตรวจสอบรายละเอียดในเวชระเบียน';
+    } else if (allergyStatus === 'none') {
+      allergyBanner.classList.add('allergy-none');
+      allergyStatusLabel.textContent = 'ไม่ทราบประวัติการแพ้';
+      allergyDetail.textContent = d.allergyText || screening.found_allergy || 'โปรดยืนยันกับผู้ป่วยก่อนสั่งยา';
+    } else {
+      allergyBanner.classList.add('allergy-unknown');
+      allergyStatusLabel.textContent = 'ยังไม่ทราบ';
+      allergyDetail.textContent = 'ไม่พบข้อมูลประวัติแพ้ยาในช่องที่เชื่อมต่อ (ข้อมูลไม่ครบไม่ได้แปลว่าไม่มีประวัติแพ้ยา)';
+    }
+  }
+
+  // แสดงการแจ้งเตือนกลับมาตรวจซ้ำที่ห้องฉุกเฉิน (ER Revisit ภายใน 48 ชม.)
+  const erBanner = document.getElementById('erRevisitBanner');
+  const erHoursBadge = document.getElementById('erHoursBadge');
+  const erDetail = document.getElementById('erRevisitDetail');
+  if (erBanner && erHoursBadge && erDetail) {
+    if (d.erRevisit48h && d.erRevisit48h.hasRevisit) {
+      const er = d.erRevisit48h;
+      erBanner.style.display = 'block';
+      erHoursBadge.textContent = `${er.hoursAgo} ชม. ที่แล้ว`;
+      let infoText = `🗓️ <b>วันที่:</b> ${escapeHtml(er.vstdate_thai || er.vstdate)} (${escapeHtml(er.vsttime)} น.) · <b>แผนก:</b> ${escapeHtml(er.department)}`;
+      if (er.cc) infoText += `<br>💬 <b>อาการที่มา ER:</b> ${escapeHtml(er.cc)}`;
+      if (er.diag) infoText += `<br>🩺 <b>วินิจฉัย ER:</b> ${escapeHtml(er.diag)}`;
+      if (er.doctor) infoText += ` <span style="color:#64748b">(${escapeHtml(er.doctor)})</span>`;
+      erDetail.innerHTML = infoText;
+    } else {
+      erBanner.style.display = 'none';
+    }
+  }
 
   // แถบน้ำหนัก ส่วนสูง และ BMI (vitals-strip)
   const bwVal = parseFloat(screening.bw);
@@ -1605,10 +1752,9 @@ function closeToast(el) {
 
 // เล่นเสียง Synthesized Chime ผ่าน Web Audio API (ไม่ต้องพึ่งไฟล์เสียงจากภายนอก)
 function playAlertChime(isCritical = false) {
+  if (!audioEnabled || !sharedAudioContext || sharedAudioContext.state !== 'running') return;
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = sharedAudioContext;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -1635,8 +1781,48 @@ function playAlertChime(isCritical = false) {
       osc.stop(now + 0.28);
     }
   } catch (e) {
-    // AudioContext blocked หรือไม่มี permission
+    // ปิดเสียงไว้เมื่อ browser ไม่พร้อม โดยไม่ขัดจังหวะงานหลัก
   }
+}
+
+function setupAudioAlerts() {
+  const button = document.getElementById('btnAudioToggle');
+  if (!button) return;
+  try {
+    audioEnabled = localStorage.getItem('doctorAssistantAudioMuted') !== 'true';
+  } catch (_) { audioEnabled = true; }
+
+  const updateButton = () => {
+    button.textContent = audioEnabled ? '🔊' : '🔇';
+    button.setAttribute('aria-pressed', String(audioEnabled));
+    button.title = audioEnabled ? 'เปิดเสียงแจ้งเตือนอัตโนมัติอยู่ — กดเพื่อปิด' : 'เสียงแจ้งเตือนปิดอยู่ — กดเพื่อเปิด';
+    button.setAttribute('aria-label', button.title);
+  };
+
+  const unlock = async () => {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx || !audioEnabled) return false;
+    try {
+      if (!sharedAudioContext) sharedAudioContext = new AudioCtx();
+      if (sharedAudioContext.state === 'suspended') await sharedAudioContext.resume();
+      return sharedAudioContext.state === 'running';
+    } catch (_) { return false; }
+  };
+
+  // Companion launches Chromium with autoplay enabled. In a regular browser, retry after any gesture if needed.
+  const unlockOnGesture = () => { unlock(); };
+  document.addEventListener('pointerdown', unlockOnGesture, { capture: true });
+  document.addEventListener('keydown', unlockOnGesture, { capture: true });
+
+  button.addEventListener('click', async () => {
+    audioEnabled = !audioEnabled;
+    try { localStorage.setItem('doctorAssistantAudioMuted', String(!audioEnabled)); } catch (_) { /* Optional browser storage. */ }
+    updateButton();
+    if (audioEnabled && await unlock()) playAlertChime(false);
+  });
+  updateButton();
+  // Start alert audio automatically; the Companion's dedicated browser profile permits autoplay.
+  unlock();
 }
 
 // ─── 4.6 เปิด/ปิด Modal ข้อมูลยาสมุนไพรและอุปกรณ์กายภาพบำบัด ───
@@ -1750,6 +1936,21 @@ function escapeHtml(str) {
   })[m]);
 }
 
+function showAppNotice(message, type = 'warning') {
+  const region = document.getElementById('appNoticeRegion');
+  if (!region) return;
+  const notice = document.createElement('div');
+  const kind = ['warning', 'error', 'success', 'info'].includes(type) ? type : 'warning';
+  const icons = { warning: '⚠️', error: '!', success: '✓', info: 'i' };
+  notice.className = `app-notice app-notice-${kind}`;
+  notice.innerHTML = `<span class="app-notice-icon" aria-hidden="true">${icons[kind]}</span><div class="app-notice-message"></div><button class="app-notice-close" type="button" aria-label="ปิดการแจ้งเตือน">×</button>`;
+  notice.querySelector('.app-notice-message').textContent = String(message || 'เกิดข้อผิดพลาด');
+  const dismiss = () => { notice.classList.add('app-notice-exit'); setTimeout(() => notice.remove(), 220); };
+  notice.querySelector('.app-notice-close').addEventListener('click', dismiss);
+  region.appendChild(notice);
+  setTimeout(dismiss, 5000);
+}
+
 // ─── 4.7 ระบบค้นหาผู้ป่วยด้วย HN, ชื่อ-สกุล หรือ VN พร้อม Dropdown แนะนำ ───
 function setupPatientSearch() {
   const btnToggle = document.getElementById('btnToggleSearch');
@@ -1830,8 +2031,8 @@ async function performPatientSearch(q) {
 
   try {
     const res = await fetch(`/api/assistant/search?q=${encodeURIComponent(q)}&limit=15`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `ค้นหาไม่สำเร็จ (HTTP ${res.status})`);
     const list = data.results || [];
 
     if (list.length === 0) {
@@ -1882,7 +2083,7 @@ async function performPatientSearch(q) {
 // ตามโมเดล รพ.บ้านด่านลานหอย เพื่อวิเคราะห์การตอบสนองต่อยา, ตรวจสอบ AKI vs CKD และแนวโน้มผลแล็บ
 window.openHistoryModal = function(type, title, subtitle, preferredTab = null) {
   if (!currentHn) {
-    alert('กรุณารอโหลดข้อมูลผู้ป่วยจาก HOSxP ก่อนเปิดดูประวัติย้อนหลัง');
+    showAppNotice('กรุณาเลือกหรือรอโหลดข้อมูลผู้ป่วยก่อนเปิดดูประวัติย้อนหลัง', 'warning');
     return;
   }
   // เคลียร์และซ่อนกราฟเดิมเสมอ ป้องกันกราฟค้างข้ามผู้ป่วยหรือข้ามเมนู
@@ -2015,14 +2216,14 @@ async function fetchAndRenderHistory(type, limit) {
       // ตารางความดัน & ชีพจร (4 คอลัมน์ กระชับ ไม่รวม นน./สส. และ แผนก)
       thead.innerHTML = `
         <tr>
-          <th style="width: 28%;">วันที่</th>
+          <th style="width: 24%;">วันที่</th>
           <th style="width: 26%;">ความดัน</th>
           <th style="width: 22%;">ชีพจร</th>
           <th style="width: 24%;">การประเมิน</th>
         </tr>
       `;
 
-      const res = await fetch(`/api/assistant/patient-vitals-history/${encodeURIComponent(currentHn)}?limit=${limit}`);
+      const res = await fetch(`/api/assistant/patient-vitals-history/${encodeURIComponent(currentHn)}?type=bp&limit=${limit}`);
       const json = await res.json();
       const list = json.data || [];
 
@@ -2117,7 +2318,7 @@ async function fetchAndRenderHistory(type, limit) {
       // ตารางประวัติน้ำหนัก ส่วนสูง และ BMI (แยกออกจาก BP/PR ตามสั่ง)
       thead.innerHTML = `
         <tr>
-          <th style="width: 28%;">วันที่</th>
+          <th style="width: 24%;">วันที่</th>
           <th style="width: 18%;">น้ำหนัก</th>
           <th style="width: 18%;">ส่วนสูง</th>
           <th style="width: 16%;">BMI</th>
@@ -2125,7 +2326,7 @@ async function fetchAndRenderHistory(type, limit) {
         </tr>
       `;
 
-      const res = await fetch(`/api/assistant/patient-vitals-history/${encodeURIComponent(currentHn)}?limit=${limit}`);
+      const res = await fetch(`/api/assistant/patient-vitals-history/${encodeURIComponent(currentHn)}?type=bw&limit=${limit}`);
       const json = await res.json();
       const list = json.data || [];
 
@@ -2502,8 +2703,8 @@ async function fetchAndRenderHistory(type, limit) {
       const labName = type.replace('lab_', '');
       thead.innerHTML = `
         <tr>
-          <th style="width: 28%;">วันที่</th>
-          <th style="width: 24%;">รายการแล็บ</th>
+          <th style="width: 24%;">วันที่</th>
+          <th style="width: 28%;">รายการแล็บ</th>
           <th style="width: 18%;">ผลตรวจ</th>
           <th style="width: 14%;">หน่วย</th>
           <th style="width: 16%;">ค่าปกติ</th>
@@ -2600,7 +2801,7 @@ function setupCopyPeButton() {
       document.execCommand('copy');
       showCopySuccess();
     } catch (e) {
-      alert('กรุณากด Ctrl+C เพื่อคัดลอกข้อความ');
+      showAppNotice('คัดลอกอัตโนมัติไม่สำเร็จ กรุณากด Ctrl+C เพื่อคัดลอกข้อความ', 'info');
     }
   }
 
@@ -3462,7 +3663,7 @@ function drawSvgChart(svgEl, seriesList, refLines) {
 // ─── ฟังก์ชันเปิดดูประวัติและกราฟแล็บทั่วไป (จากปุ่ม ดูกราฟแล็บ) ───
 window.openGeneralLabHistory = function() {
   if (!currentHn) {
-    alert('กรุณารอโหลดข้อมูลผู้ป่วยจาก HOSxP ก่อน');
+    showAppNotice('กรุณาเลือกหรือรอโหลดข้อมูลผู้ป่วยจาก HOSxP ก่อน', 'warning');
     return;
   }
   // ถ้าใน Visit ปัจจุบันมีผลแล็บ ให้เปิดตัวแรก หรือถ้าไม่มีให้เปิด CBC เป็นค่าเริ่มต้น
@@ -3484,7 +3685,7 @@ function setupVisitPicker() {
   btnSelect.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (!currentHn) {
-      alert('กรุณารอโหลดข้อมูลคนไข้ก่อนเลือก Visit');
+      showAppNotice('กรุณาเลือกหรือรอโหลดข้อมูลคนไข้ก่อนเลือก Visit', 'warning');
       return;
     }
 
