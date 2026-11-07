@@ -54,7 +54,7 @@ function setAssistantSessionActive(active, user = '', authMode = '') {
     const hn = document.getElementById('patientHnBadge'); if (hn) hn.textContent = 'HN -';
     const vn = document.getElementById('patientVn'); if (vn) vn.textContent = '-';
     const ccRow = document.getElementById('patientCcRow'); if (ccRow) ccRow.style.display = 'none';
-    const erBanner = document.getElementById('erRevisitBanner'); if (erBanner) erBanner.style.display = 'none';
+    const erBanner = document.getElementById('erRevisitBanner'); if (erBanner) erBanner.style.display = 'none'; const readmBanner = document.getElementById('readmissionBanner'); if (readmBanner) readmBanner.style.display = 'none'; const gapBanner = document.getElementById('careGapBanner'); if (gapBanner) gapBanner.style.display = 'none'; const recMedsCard = document.getElementById('recentMedsCard'); if (recMedsCard) recMedsCard.style.display = 'none';
     const allergy = document.getElementById('allergyBanner'); if (allergy) allergy.hidden = true;
   }
   if (overlay) overlay.hidden = !locked;
@@ -595,6 +595,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setupCopyPeButton();
   setupModalTabsAndDoseFilter();
+  document.getElementById('btnToggleRecentMeds')?.addEventListener('click', () => {
+    const body = document.getElementById('recentMedsBody');
+    const arrow = document.getElementById('recentMedsArrow');
+    if (!body) return;
+    const isClosed = (body.style.display === 'none');
+    body.style.display = isClosed ? 'block' : 'none';
+    arrow?.classList.toggle('open', isClosed);
+  });
 
   document.getElementById('btnCloseHistModal')?.addEventListener('click', closeHistoryModal);
   document.getElementById('btnHistClose')?.addEventListener('click', closeHistoryModal);
@@ -852,6 +860,69 @@ function renderAssistant(d, isChanged = false) {
       erDetail.innerHTML = infoText;
     } else {
       erBanner.style.display = 'none';
+    }
+  }
+
+  // 1. แสดงการแจ้งเตือนเพิ่งจำหน่ายจากผู้ป่วยใน (IPD Readmission ภายใน 28 วัน)
+  const readmBanner = document.getElementById('readmissionBanner');
+  const readmBadge = document.getElementById('readmissionDaysBadge');
+  const readmDetail = document.getElementById('readmissionDetail');
+  if (readmBanner && readmBadge && readmDetail) {
+    if (d.readmission28d && d.readmission28d.hasReadmission) {
+      const r = d.readmission28d;
+      readmBanner.style.display = 'block';
+      readmBadge.textContent = `${r.daysAgo} วันที่แล้ว`;
+      let infoText = `🗓️ <b>Discharge:</b> ${escapeHtml(r.dchdate_thai || r.dchdate)} (${escapeHtml(r.dchtime)} น.) · <b>ตึก:</b> ${escapeHtml(r.ward)}`;
+      if (r.diag) infoText += `<br>🩺 <b>วินิจฉัยก่อนจำหน่าย:</b> ${escapeHtml(r.diag)}`;
+      if (r.doctor) infoText += ` <span style="color:#64748b">(แพทย์: ${escapeHtml(r.doctor)})</span>`;
+      readmDetail.innerHTML = infoText;
+    } else {
+      readmBanner.style.display = 'none';
+    }
+  }
+
+  // 2. แสดงการแจ้งเตือนสิ่งที่ควรติดตามในโรคเรื้อรัง (Chronic Care Gap)
+  const gapBanner = document.getElementById('careGapBanner');
+  const gapCountBadge = document.getElementById('careGapCountBadge');
+  const gapList = document.getElementById('careGapList');
+  if (gapBanner && gapCountBadge && gapList) {
+    if (d.careGap && d.careGap.hasGap && Array.isArray(d.careGap.gaps) && d.careGap.gaps.length > 0) {
+      gapBanner.style.display = 'block';
+      gapCountBadge.textContent = `${d.careGap.gaps.length} รายการ`;
+      gapList.innerHTML = d.careGap.gaps.map(g => `
+        <div class="care-gap-item">
+          <span class="care-gap-tag">${escapeHtml(g.label)}</span>
+          <div>
+            <b>${escapeHtml(g.reason)}</b>
+            ${g.lastDate ? `<br><small style="color:#92400e;">ตรวจล่าสุด: ${escapeHtml(g.lastDate)} (ผล: <b>${escapeHtml(g.lastValue)}</b>)</small>` : ''}
+          </div>
+        </div>
+      `).join('');
+    } else {
+      gapBanner.style.display = 'none';
+    }
+  }
+
+  // 3. แสดงรายการยาเดิมที่ได้รับในรอบ 30 วัน (Drug Overlap Check)
+  const recentMedsCard = document.getElementById('recentMedsCard');
+  const recentMedsCount = document.getElementById('recentMedsCount');
+  const recentMedsList = document.getElementById('recentMedsList');
+  if (recentMedsCard && recentMedsCount && recentMedsList) {
+    const list = d.recentMeds30d || [];
+    if (list.length > 0) {
+      recentMedsCard.style.display = 'block';
+      recentMedsCount.textContent = list.length;
+      recentMedsList.innerHTML = list.map(m => `
+        <div class="recent-med-item">
+          <div class="recent-med-top">
+            <span class="recent-med-name">${escapeHtml(m.name)} ${escapeHtml(m.strength || '')} <small style="color:#0f766e; font-weight:700;">x ${m.qty} ${escapeHtml(m.units || '')}</small></span>
+            <span class="recent-med-time">${escapeHtml(m.vstdate_thai)} (${m.daysAgo} วันที่แล้ว)</span>
+          </div>
+          <div class="recent-med-usage">วิธีใช้: ${escapeHtml(m.usage)}</div>
+        </div>
+      `).join('');
+    } else {
+      recentMedsCard.style.display = 'none';
     }
   }
 

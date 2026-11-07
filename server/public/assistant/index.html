@@ -127,6 +127,34 @@
       </div>
     </section>
 
+    <!-- แจ้งเตือน: เพิ่งจำหน่ายจากผู้ป่วยใน (IPD Readmission ภายใน 28 วัน) -->
+    <section class="readmission-banner" id="readmissionBanner" role="alert" style="display: none;">
+      <div class="readmission-head">
+        <span class="readmission-icon">🏥</span>
+        <div class="readmission-title-wrap">
+          <strong class="readmission-title">เพิ่งจำหน่ายจากผู้ป่วยใน (IPD Readmission ใน 28 วัน)</strong>
+          <span class="readmission-days-badge" id="readmissionDaysBadge">- วันที่แล้ว</span>
+        </div>
+      </div>
+      <div class="readmission-body" id="readmissionBody">
+        <div class="readmission-detail" id="readmissionDetail">-</div>
+      </div>
+    </section>
+
+    <!-- แจ้งเตือน: สิ่งที่ควรติดตามในโรคเรื้อรัง (Chronic Care Gap) -->
+    <section class="care-gap-banner" id="careGapBanner" role="alert" style="display: none;">
+      <div class="care-gap-head">
+        <span class="care-gap-icon">📋</span>
+        <div class="care-gap-title-wrap">
+          <strong class="care-gap-title">สิ่งที่ควรติดตามในโรคเรื้อรัง (Care Gap Alert)</strong>
+          <span class="care-gap-count-badge" id="careGapCountBadge">- รายการ</span>
+        </div>
+      </div>
+      <div class="care-gap-body" id="careGapBody">
+        <div class="care-gap-list" id="careGapList"></div>
+      </div>
+    </section>
+
     <!-- 1. ไต & สัญญาณชีพ -->
     <section class="card-section" id="secRenal">
       <div class="section-title">
@@ -209,6 +237,20 @@
         <div class="alert-content">
           <b id="drugAlertTitle">ข้อควรระวังเรื่องยา</b>
           <p id="drugAlertDesc" style="white-space: pre-line;">-</p>
+        </div>
+      </div>
+
+      <!-- ประวัติยาเดิมที่ได้รับในรอบ 30 วัน (Drug Overlap Check) -->
+      <div class="recent-meds-card" id="recentMedsCard" style="display: none;">
+        <div class="recent-meds-header" id="btnToggleRecentMeds">
+          <div class="recent-meds-title">
+            <span>💊 ยาเดิมที่ได้รับในรอบ 30 วัน</span>
+            <span class="badge-count" id="recentMedsCount">0</span>
+          </div>
+          <span class="toggle-arrow" id="recentMedsArrow">▼</span>
+        </div>
+        <div class="recent-meds-body" id="recentMedsBody" style="display: none;">
+          <div class="recent-meds-list" id="recentMedsList"></div>
         </div>
       </div>
 

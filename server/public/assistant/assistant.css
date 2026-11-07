@@ -2498,3 +2498,212 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
 .privacy-modal[hidden]{display:none}
 .privacy-modal-card{position:relative;width:min(620px,100%);max-height:85vh;overflow:auto;padding:26px;background:#fff;border-radius:14px;box-shadow:0 20px 60px #0004;color:#243b50;line-height:1.65}
 .privacy-modal-card h2{margin:0 35px 14px 0}.privacy-close{position:absolute;right:14px;top:10px;border:0;background:none;font-size:28px;cursor:pointer;color:#617487}
+
+/* ─── IPD Readmission within 28 days Banner ─── */
+.readmission-banner {
+  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+  border: 1.5px solid #a5b4fc;
+  border-left: 5px solid #6366f1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 8px 12px 10px 12px;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.1);
+  animation: slideDown 0.25s ease-out;
+}
+.readmission-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.readmission-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.readmission-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+.readmission-title {
+  font-size: 13.5px;
+  color: #312e81;
+  font-weight: 700;
+}
+.readmission-days-badge {
+  background: #4f46e5;
+  color: #ffffff;
+  padding: 2.5px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.readmission-body {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #c7d2fe;
+}
+.readmission-detail {
+  font-size: 12px;
+  color: #3730a3;
+  line-height: 1.55;
+}
+
+/* ─── Chronic Care Gap Banner ─── */
+.care-gap-banner {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fcd34d;
+  border-left: 5px solid #d97706;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 8px 12px 10px 12px;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.1);
+  animation: slideDown 0.25s ease-out;
+}
+.care-gap-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.care-gap-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.care-gap-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+.care-gap-title {
+  font-size: 13.5px;
+  color: #78350f;
+  font-weight: 700;
+}
+.care-gap-count-badge {
+  background: #b45309;
+  color: #ffffff;
+  padding: 2.5px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.care-gap-body {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #fde68a;
+}
+.care-gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.care-gap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.45;
+}
+.care-gap-tag {
+  background: #fef08a;
+  border: 1px solid #eab308;
+  color: #854d0e;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 10.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Recent Medications in 30 days Card ─── */
+.recent-meds-card {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin: 10px 0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.recent-meds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  background: #f1f5f9;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.recent-meds-header:hover {
+  background: #e2e8f0;
+}
+.recent-meds-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+.badge-count {
+  background: #64748b;
+  color: #fff;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.toggle-arrow {
+  font-size: 11px;
+  color: #64748b;
+  transition: transform 0.2s ease;
+}
+.toggle-arrow.open {
+  transform: rotate(180deg);
+}
+.recent-meds-body {
+  padding: 8px 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.recent-meds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recent-med-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.recent-med-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.recent-med-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.recent-med-time {
+  font-size: 10.5px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.recent-med-usage {
+  font-size: 11px;
+  color: #475569;
+}

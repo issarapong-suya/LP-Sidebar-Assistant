@@ -325,6 +325,193 @@ router.get('/visit-data/:vn', async (req, res) => {
     } catch (erErr) {
       console.warn('[assistant] ER revisit check error:', erErr.code || erErr.name || 'error');
     }
+    // 1. IPD Readmission within 28 days
+    let readmission28d = null;
+    try {
+      const [ipdRows] = await db.execute(`
+        SELECT i.an, i.hn,
+               DATE_FORMAT(i.regdate, '%Y-%m-%d') AS regdate,
+               DATE_FORMAT(i.dchdate, '%Y-%m-%d') AS dchdate,
+               i.dchtime,
+               IFNULL(w.name, 'หอผู้ป่วยใน') AS ward_name,
+               IFNULL(d.name, '') AS doctor_name,
+               IFNULL(a.pdx, '') AS pdx,
+               IFNULL(ic.name, '') AS pdx_name,
+               IFNULL(i.prediag, '') AS prediag,
+               DATEDIFF(?, i.dchdate) AS days_since_dch
+        FROM ipt i
+        LEFT JOIN ward w ON i.ward = w.ward
+        LEFT JOIN doctor d ON i.dch_doctor = d.code
+        LEFT JOIN an_stat a ON i.an = a.an
+        LEFT JOIN icd101 ic ON a.pdx = ic.code
+        WHERE i.hn = ?
+          AND i.dchdate IS NOT NULL
+          AND i.dchdate <= ?
+          AND DATEDIFF(?, i.dchdate) BETWEEN 0 AND 28
+          AND (i.dchstts NOT IN ('08', '09') OR i.dchstts IS NULL)
+          AND (i.dchtype NOT IN ('08', '09') OR i.dchtype IS NULL)
+        ORDER BY i.dchdate DESC, i.dchtime DESC
+        LIMIT 1
+      `, [visit.vstdate, visit.hn, visit.vstdate, visit.vstdate]);
+      if (ipdRows[0]) {
+        const ipd = ipdRows[0];
+        const diagDesc = ipd.pdx_name ? `${ipd.pdx}: ${ipd.pdx_name}` : (ipd.prediag || ipd.pdx || '');
+        readmission28d = {
+          hasReadmission: true,
+          an: String(ipd.an),
+          regdate: ipd.regdate,
+          regdate_thai: thaiDate(ipd.regdate),
+          dchdate: ipd.dchdate,
+          dchdate_thai: thaiDate(ipd.dchdate),
+          dchtime: ipd.dchtime ? String(ipd.dchtime).slice(0, 5) : '',
+          daysAgo: Math.max(0, Number(ipd.days_since_dch) || 0),
+          ward: String(ipd.ward_name || 'หอผู้ป่วยใน'),
+          diag: String(diagDesc),
+          doctor: String(ipd.doctor_name || '')
+        };
+      }
+    } catch (ipdErr) {
+      console.warn('[assistant] Readmission 28d check error:', ipdErr.code || ipdErr.name || 'error');
+    }
+
+    // 2. Chronic Care Gap (DM HbA1c in 6 months, UACR in 1 year)
+    let careGap = { hasGap: false, gaps: [] };
+    try {
+      const [clinics] = await db.execute(`
+        SELECT cm.clinic, c.name AS clinic_name
+        FROM clinicmember cm
+        JOIN clinic c ON cm.clinic = c.clinic
+        WHERE cm.hn = ? AND (cm.dchdate IS NULL OR cm.dchdate = '')
+      `, [visit.hn]);
+
+      const isDm = clinics.some(c => String(c.clinic) === '001' || /เบาหวาน|dm\b/i.test(c.clinic_name));
+      const isHt = clinics.some(c => String(c.clinic) === '002' || /ความดัน|ht\b/i.test(c.clinic_name));
+
+      let hasDmDx = isDm, hasHtDx = isHt;
+      if (!isDm || !isHt) {
+        const [pastDx] = await db.execute(`
+          SELECT icd10 FROM ovstdiag WHERE hn = ? AND (icd10 LIKE 'E10%' OR icd10 LIKE 'E11%' OR icd10 LIKE 'E14%' OR icd10 LIKE 'I10%')
+          LIMIT 10
+        `, [visit.hn]);
+        if (pastDx.some(d => d.icd10?.startsWith('E'))) hasDmDx = true;
+        if (pastDx.some(d => d.icd10?.startsWith('I10'))) hasHtDx = true;
+      }
+
+      if (hasDmDx) {
+        const [hba1cRows] = await db.execute(`
+          SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                 DATEDIFF(?, lh.order_date) AS days_ago
+          FROM lab_head lh
+          JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+          JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+          WHERE lh.hn = ?
+            AND (li.lab_items_name LIKE '%a1c%' OR li.lab_items_name LIKE '%HbA1c%')
+            AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+          ORDER BY lh.order_date DESC
+          LIMIT 1
+        `, [visit.vstdate, visit.hn]);
+
+        if (!hba1cRows[0]) {
+          careGap.gaps.push({
+            type: 'hba1c',
+            label: 'HbA1c (น้ำตาลสะสม)',
+            reason: 'ไม่พบประวัติตรวจ HbA1c ในระบบ',
+            daysAgo: null,
+            lastDate: null,
+            lastValue: null,
+            severity: 'warn'
+          });
+        } else if (Number(hba1cRows[0].days_ago) > 180) {
+          const days = Number(hba1cRows[0].days_ago);
+          const months = Math.floor(days / 30);
+          careGap.gaps.push({
+            type: 'hba1c',
+            label: 'HbA1c (น้ำตาลสะสม)',
+            reason: `ไม่ได้ตรวจเกิน ${months} เดือน (เกณฑ์: ทุก 6 เดือน)`,
+            daysAgo: days,
+            lastDate: thaiDate(hba1cRows[0].order_date),
+            lastValue: `${hba1cRows[0].lab_order_result}%`,
+            severity: 'warn'
+          });
+        }
+      }
+
+      const isCkd = Number(screening.egfr || 0) > 0 && Number(screening.egfr || 0) < 60;
+      if (hasDmDx || hasHtDx || isCkd) {
+        const [uacrRows] = await db.execute(`
+          SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                 DATEDIFF(?, lh.order_date) AS days_ago
+          FROM lab_head lh
+          JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+          JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+          WHERE lh.hn = ?
+            AND (li.lab_items_name LIKE '%uacr%' OR li.lab_items_name LIKE '%microalbumin%')
+            AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+          ORDER BY lh.order_date DESC
+          LIMIT 1
+        `, [visit.vstdate, visit.hn]);
+
+        if (!uacrRows[0]) {
+          careGap.gaps.push({
+            type: 'uacr',
+            label: 'UACR (โปรตีนรั่วในปัสสาวะ)',
+            reason: 'ไม่พบประวัติตรวจ UACR ในระบบ',
+            daysAgo: null,
+            lastDate: null,
+            lastValue: null,
+            severity: 'info'
+          });
+        } else if (Number(uacrRows[0].days_ago) > 365) {
+          const days = Number(uacrRows[0].days_ago);
+          careGap.gaps.push({
+            type: 'uacr',
+            label: 'UACR (โปรตีนรั่วในปัสสาวะ)',
+            reason: `ไม่ได้ตรวจเกิน 1 ปี (${Math.floor(days / 30)} เดือน, เกณฑ์: ทุกปี)`,
+            daysAgo: days,
+            lastDate: thaiDate(uacrRows[0].order_date),
+            lastValue: uacrRows[0].lab_order_result,
+            severity: 'info'
+          });
+        }
+      }
+
+      careGap.hasGap = careGap.gaps.length > 0;
+    } catch (gapErr) {
+      console.warn('[assistant] Chronic care gap check error:', gapErr.code || gapErr.name || 'error');
+    }
+
+    // 3. Recent Medications in 30 days
+    let recentMeds30d = [];
+    try {
+      const [recMeds] = await db.execute(`
+        SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate, o.icode, d.name, d.strength, d.units, SUM(o.qty) AS total_qty,
+               CONCAT(IFNULL(u.name1,''),' ',IFNULL(u.name2,''),' ',IFNULL(u.name3,'')) AS drug_usage,
+               DATEDIFF(?, o.vstdate) AS days_ago
+        FROM opitemrece o
+        JOIN drugitems d ON o.icode=d.icode
+        LEFT JOIN drugusage u ON o.drugusage=u.drugusage
+        WHERE o.hn = ?
+          AND o.vn != ?
+          AND o.vstdate BETWEEN DATE_SUB(?, INTERVAL 30 DAY) AND DATE_SUB(?, INTERVAL 1 DAY)
+        GROUP BY o.vstdate, o.icode, d.name, d.strength, d.units, u.name1, u.name2, u.name3
+        ORDER BY o.vstdate DESC, d.name ASC
+        LIMIT 15
+      `, [visit.vstdate, visit.hn, vn, visit.vstdate, visit.vstdate]);
+      recentMeds30d = recMeds.map(r => ({
+        vstdate: r.vstdate,
+        vstdate_thai: thaiDate(r.vstdate),
+        daysAgo: Number(r.days_ago),
+        icode: r.icode,
+        name: r.name,
+        strength: r.strength,
+        units: r.units,
+        qty: Number(r.total_qty),
+        usage: r.drug_usage?.trim() || '-'
+      }));
+    } catch (medErr) {
+      console.warn('[assistant] Recent meds check error:', medErr.code || medErr.name || 'error');
+    }
+
 
     const payload = {
       success: true,
@@ -334,6 +521,9 @@ router.get('/visit-data/:vn', async (req, res) => {
       allergies: positiveAllergyRows,
       allergyText,
       erRevisit48h,
+      readmission28d,
+      careGap,
+      recentMeds30d,
       screening: { ...screening, cr: creatinine ? creatinine.toFixed(2) : '0', egfr: egfr ? egfr.toFixed(1) : '0', crcl: crcl ? crcl.toFixed(1) : '', stage: egfr >= 90 ? '1' : egfr >= 60 ? '2' : egfr >= 30 ? '3' : egfr >= 15 ? '4' : egfr ? '5' : '-' },
       diagnoses: diagnosesOut, medications, labResults
     };
