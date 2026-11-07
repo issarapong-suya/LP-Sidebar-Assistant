@@ -633,14 +633,18 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
     hct: "(li.lab_items_name LIKE '%Hematocrit%' OR li.lab_items_name LIKE '%Hct%')",
     uacr: "(li.lab_items_name LIKE '%UACR%' OR li.lab_items_name LIKE '%Albumin Creatinine Ratio%' OR li.lab_items_name LIKE '%Urine ACR%')",
     k: "(li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%')",
+    potassium: "(li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%')",
     na: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
+    sodium: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
     bun: "li.lab_items_name LIKE '%BUN%'", uric: "li.lab_items_name LIKE '%Uric%'",
     ast: "(li.lab_items_name LIKE '%SGOT%' OR li.lab_items_name LIKE '%AST%')",
     alt: "(li.lab_items_name LIKE '%SGPT%' OR li.lab_items_name LIKE '%ALT%')",
     wbc: "(li.lab_items_name LIKE '%WBC%' OR li.lab_items_name LIKE '%White Blood%')",
-    platelet: "(li.lab_items_name LIKE '%Platelet%' OR li.lab_items_name LIKE '%Plt%')"
+    platelet: "(li.lab_items_name LIKE '%Platelet%' OR li.lab_items_name LIKE '%Plt%')",
+    cbc: "(lh.form_name LIKE '%CBC%' OR li.lab_items_name IN ('WBC','RBC','Hemoglobin','Hb','Hct','Hematocrit','Hematocrit2','Platelet Count','PMN','Lymphocyte','MCV','MCH','MCHC','Monocyte','Eosinophil','Basophil','RDW'))"
   };
-  const configuredCodes = getConfig()?.schema?.labTrendCodes?.[type];
+  const typeKey = (type === 'potassium' ? 'k' : (type === 'sodium' ? 'na' : type));
+  const configuredCodes = getConfig()?.schema?.labTrendCodes?.[typeKey] || getConfig()?.schema?.labTrendCodes?.[type];
   const codeList = Array.isArray(configuredCodes) ? configuredCodes.map(code => String(code).trim()).filter(code => /^[A-Za-z0-9._-]{1,30}$/.test(code)).slice(0, 20) : [];
   const where = codeList.length ? `lo.lab_items_code IN (${codeList.map(() => '?').join(',')})` : (matches[type] || 'li.lab_items_name LIKE ?');
   const params = [hn];

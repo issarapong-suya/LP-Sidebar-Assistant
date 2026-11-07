@@ -1137,10 +1137,11 @@ function evaluateLabResult(l) {
     isAbnormal = true;
   }
 
-  // 2. ตรวจสอบเทียบกับช่วงค่าปกติ (normal_value) จากระบบ HOSxP
-  if (normStr && hasNum) {
-    // ช่วงตัวเลข min - max (เช่น 70-115, 3.50-5.50, 10 - 50)
-    const rangeMatch = normStr.match(/([0-9.]+)\s*[-–—]\s*([0-9.]+)/);
+  // 2. ตรวจสอบเทียบกับช่วงค่าปกติ (normal_value) จากระบบ HOSxP (ตัด comma ออกเพื่อรองรับเช่น 140,000-400,000)
+  const cleanNorm = normStr.replace(/,/g, '');
+  if (cleanNorm && hasNum) {
+    // ช่วงตัวเลข min - max (เช่น 70-115, 3.50-5.50, 10 - 50, 140000 - 400000)
+    const rangeMatch = cleanNorm.match(/([0-9.]+)\s*[-–—]\s*([0-9.]+)/);
     if (rangeMatch) {
       const min = parseFloat(rangeMatch[1]);
       const max = parseFloat(rangeMatch[2]);
@@ -1153,7 +1154,7 @@ function evaluateLabResult(l) {
       }
     } else {
       // รูปแบบ < X หรือ <= X
-      const lessMatch = normStr.match(/[<≤]\s*([0-9.]+)/);
+      const lessMatch = cleanNorm.match(/[<≤]\s*([0-9.]+)/);
       if (lessMatch) {
         const max = parseFloat(lessMatch[1]);
         if (!isNaN(max) && val > max) {
@@ -1162,7 +1163,7 @@ function evaluateLabResult(l) {
         }
       }
       // รูปแบบ > X หรือ >= X
-      const greaterMatch = normStr.match(/[>≥]\s*([0-9.]+)/);
+      const greaterMatch = cleanNorm.match(/[>≥]\s*([0-9.]+)/);
       if (greaterMatch) {
         const min = parseFloat(greaterMatch[1]);
         if (!isNaN(min) && val < min) {
