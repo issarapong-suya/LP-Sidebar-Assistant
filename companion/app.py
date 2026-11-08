@@ -33,7 +33,7 @@ INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"
 INSTALLED_EXE = os.path.join(INSTALL_DIR, "DoctorAssistantCompanion.exe")
 
 COMPANION_VERSION = "1"
-COMPANION_BUILD = "20261107.06"
+COMPANION_BUILD = "20261108.03"
 
 # ค่าเริ่มต้น (ไม่เก็บรหัสผ่านเป็น plain text ใน config.json เพื่อความปลอดภัยสูงสุด)
 DEFAULT_CONFIG = {
@@ -1028,7 +1028,8 @@ class FloatingDoctorApp:
                 "session_active": bool(user and user.strip()),
                 "companion_version": COMPANION_VERSION,
                 "companion_build": COMPANION_BUILD,
-                "trigger": trigger
+                "trigger": trigger,
+                "live_diag": live_diag
             }
             if click_id:
                 payload["click_id"] = click_id
@@ -1392,16 +1393,33 @@ $form.ShowDialog()
 
                 vn_changed = (new_vn != self.last_vn)
 
+                # ดักจับข้อความที่แพทย์กำลังพิมพ์สดใน HOSxP (เช่น ช่องการวินิจฉัย, ค้นหาโรค, CC, PE)
+                live_text = ""
+                if curr_user:
+                    try:
+                        live_text = get_hosxp_live_typing_text() or ""
+                    except Exception:
+                        pass
+                last_live = getattr(self, "last_live_text", "")
+                if vn_changed:
+                    # เปลี่ยนคนไข้ใหม่ ให้รีเซ็ตข้อความพิมพ์ของคนเดิม
+                    self.last_live_text = ""
+                    last_live = ""
+
+                live_changed = bool(live_text != last_live)
+
                 # ส่งข้อมูล Sync ไปยัง Server ทันทีเมื่อ:
                 # 1. ผู้ใช้งาน HOSxP เปลี่ยนแปลง (เปลี่ยนหมอ หรือ ปิด HOSxP)
                 # 2. คนไข้ใน HOSxP เปลี่ยนแปลง
-                # 3. Heartbeat ปกติทุก 5.0 วินาที เพื่อยืนยันว่า HOSxP ยังเปิดใช้งานอยู่
-                if user_changed or vn_changed or (now - last_heartbeat > 5.0):
+                # 3. ข้อความที่กำลังพิมพ์เปลี่ยนแปลง (Live Typing / Live Diagnosis)
+                # 4. Heartbeat ปกติทุก 5.0 วินาที เพื่อยืนยันว่า HOSxP ยังเปิดใช้งานอยู่
+                if user_changed or vn_changed or live_changed or (now - last_heartbeat > 5.0):
                     self.last_vn = new_vn if curr_user else None
                     self.last_user = curr_user
+                    self.last_live_text = live_text
                     last_heartbeat = now
-                    trigger = "user_change" if user_changed else ("patient_change" if vn_changed else "poll")
-                    self.notify_server_patient(self.last_vn or "", hn if curr_user else "", user=curr_user, trigger=trigger)
+                    trigger = "typing_change" if live_changed else ("user_change" if user_changed else ("patient_change" if vn_changed else "poll"))
+                    self.notify_server_patient(self.last_vn or "", hn if curr_user else "", user=curr_user, trigger=trigger, live_diag=live_text)
 
                     # หากเลือกคนไข้ใหม่บน HOSxP ให้ sidebar หน้าต่างเดิมเด้งมาแสดง top บนโปรแกรมที่เปิดอยู่ทันที
                     if vn_changed and self.last_vn:

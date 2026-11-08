@@ -13,7 +13,7 @@ const app = express();
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const PRODUCT_VERSION = '1';
-const PRODUCT_BUILD = '20261108.02';
+const PRODUCT_BUILD = '20261108.03';
 const companionSessions = new Map();
 const manualSessions = new Map();
 const enrollmentCodes = new Map();
@@ -543,7 +543,7 @@ app.use('/api', (req, res, next) => {
     return res.status(403).json({ success: false, error: 'เครื่องนี้ไม่ได้อยู่ในวงเครือข่ายที่อนุญาต' });
   }
   // These endpoints carry Companion's short-lived HOSxP session heartbeat or report the lock state.
-  if (req.path === '/sync-patient' || req.path === '/notify-patient' || req.path === '/version' || req.path === '/auth/login' || req.path === '/auth/logout') return next();
+  if (req.path.endsWith('/sync-patient') || req.path.endsWith('/notify-patient') || req.path.endsWith('/version') || req.path.endsWith('/auth/login') || req.path.endsWith('/auth/logout')) return next();
   const clientIp = requestClientIp(req);
   const companion = companionSessions.get(clientIp);
   if (companion?.active && Date.now() - companion.timestamp <= 15000) {

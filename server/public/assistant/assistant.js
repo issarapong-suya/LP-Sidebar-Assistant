@@ -677,8 +677,8 @@ async function checkActiveSessionOnce() {
       loadPatientData(currentHosxpVn, data.hn || null);
     } else if (!isManualSearchActive && currentHosxpVn && currentHosxpVn !== currentVn) {
       loadPatientData(currentHosxpVn, data.hn || null);
-    } else if (data.live_diag && data.live_diag !== currentLiveDiag) {
-      currentLiveDiag = data.live_diag;
+    } else if (data.live_diag !== undefined && data.live_diag !== currentLiveDiag) {
+      currentLiveDiag = data.live_diag || '';
       if (currentPatientData && (!isManualSearchActive || currentVn === currentHosxpVn)) {
         renderDrugAndHerbs(
           currentPatientData.patient || {},
@@ -686,7 +686,8 @@ async function checkActiveSessionOnce() {
           currentPatientData.labs || [],
           currentPatientData.diagnoses || [],
           currentPatientData.medications || [],
-          currentPatientData.visit || {}
+          currentPatientData.visit || {},
+          currentPatientData.recentMeds30d || []
         );
       }
     }
@@ -702,6 +703,9 @@ async function loadPatientData(vn, hn) {
   const allergyBanner = document.getElementById('allergyBanner');
   if (allergyBanner) allergyBanner.hidden = true;
   const isChanged = (currentVn !== vn);
+  if (isChanged) {
+    currentLiveDiag = '';
+  }
   currentVn = vn;
   currentHn = hn || null;
 
@@ -966,11 +970,16 @@ function renderAssistant(d, isChanged = false) {
       gapCountBadge.textContent = `${d.careGap.gaps.length} รายการ`;
       gapList.innerHTML = d.careGap.gaps.map(g => `
         <div class="care-gap-item">
-          <span class="care-gap-tag">${escapeHtml(g.label)}</span>
-          <div>
-            <b>${escapeHtml(g.reason)}</b>
-            ${g.lastDate ? `<br><small style="color:#92400e;">ตรวจล่าสุด: ${escapeHtml(g.lastDate)} (ผล: <b>${escapeHtml(g.lastValue)}</b>)</small>` : ''}
+          <div class="care-gap-item-left">
+            <span class="care-gap-tag">${escapeHtml(g.label)}</span>
+            <div class="care-gap-text">
+              <b>${escapeHtml(g.reason)}</b>
+              ${g.lastDate ? `<br><small style="color:#92400e;">ตรวจล่าสุด: ${escapeHtml(g.lastDate)} (ผล: <b>${escapeHtml(g.lastValue)}</b>)</small>` : ''}
+            </div>
           </div>
+          <button type="button" class="btn-gap-chart" onclick="openLabHistory('${escapeHtml(g.type)}')" title="คลิกเพื่อดูกราฟแนวโน้ม ${escapeHtml(g.label)}">
+            📈 ดูกราฟ
+          </button>
         </div>
       `).join('');
     } else {
@@ -1022,7 +1031,7 @@ function renderAssistant(d, isChanged = false) {
   const labAlertCount = renderLabAlerts(d.labResults || [], labs);
 
   // คำเตือนยา & เสนอยาสมุนไพร
-  const herbAlertData = renderDrugAndHerbs(patient, screening, labs, diag, meds, visit);
+  const herbAlertData = renderDrugAndHerbs(patient, screening, labs, diag, meds, visit, d.recentMeds30d || []);
 
   // วันนัด & คำนวณจำนวนเม็ดยา
   renderAppointmentAndCalc(appt);
@@ -1479,7 +1488,7 @@ function renderLabAlerts(labGroups, flatLabs) {
 }
 
 // ─── 4.3 คำเตือนยา & เสนอยาสมุนไพรทางเลือก (โมเดล รพ.บ้านด่านลานหอย) ───
-function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit) {
+function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit, recentMeds = []) {
   const drugAlertBox = document.getElementById('boxDrugAlert');
   const drugTitle = document.getElementById('drugAlertTitle');
   const drugDesc = document.getElementById('drugAlertDesc');
@@ -1488,40 +1497,219 @@ function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit) {
   const peTextarea = document.getElementById('peTextarea');
   const realtimeTag = document.getElementById('herbRealtimeTag');
 
-  // ตรวจ eGFR / Cr
+  // ตรวจ eGFR / Cr / Potassium
   let egfr = parseFloat(screening.egfr) || null;
   let cr = parseFloat(screening.cr) || null;
   const crLab = labs.find(l => /creatinine|cr\b/i.test(l.item_name || ''));
   if (crLab) cr = parseFloat(crLab.result);
+
+  const kLab = labs.find(l => (/potassium|^k\b/i.test(l.item_name || '') && !/gap/i.test(l.item_name || '')));
+  const kVal = kLab ? parseFloat(kLab.result) : null;
 
   const astLab = labs.find(l => /sgot|ast\b/i.test(l.item_name || ''));
   const altLab = labs.find(l => /sgpt|alt\b/i.test(l.item_name || ''));
   const astVal = astLab ? parseFloat(astLab.result) : 0;
   const altVal = altLab ? parseFloat(altLab.result) : 0;
 
-  const alerts = [];
-  const isOnWarfarin = !!(visit?.is_on_warfarin || patient.warfarin === 'Y');
+  const curMeds = Array.isArray(meds) ? meds : [];
+  const past30Meds = Array.isArray(recentMeds) && recentMeds.length ? recentMeds : (currentPatientData?.recentMeds30d || []);
 
-  // Warfarin Check
-  if (isOnWarfarin) {
-    alerts.push('• 🩸 ผู้ป่วยได้รับยา WARFARIN: ระวัง Drug Interaction (NSAIDs, ยาฆ่าเชื้อกลุ่ม Fluoroquinolones, Macrolides, Azoles)');
-  }
+  const criticalAlerts = [];
+  const warningAlerts = [];
+  const infoAlerts = [];
 
-  // Renal Check
-  if (egfr && egfr > 0 && egfr < 60) {
-    alerts.push(`• ⚠️ ผู้ป่วยมีภาวะการทำงานของไตลดลง (eGFR ${Math.round(egfr)}):`);
-    alerts.push('   - ระวังการสั่งยาแก้ปวดกลุ่ม NSAIDs (Ibuprofen, Naproxen, Diclofenac, Celecoxib)');
-    if (egfr < 45) {
-      alerts.push('   - ควรปรับลดขนาด Metformin (หาก eGFR < 30 ml/min ควรหยุดใช้)');
+  const isOnWarfarin = !!(
+    visit?.is_on_warfarin ||
+    patient.warfarin === 'Y' ||
+    curMeds.some(m => /warfarin/i.test(m.name || '')) ||
+    past30Meds.some(m => /warfarin/i.test(m.name || ''))
+  );
+
+  // 1. Renal Dose Adjustment & Safety Rules
+  // 1.1 Metformin
+  const curMetformin = curMeds.find(m => /metformin|glucophage/i.test(m.name || ''));
+  if (curMetformin) {
+    if (egfr !== null && egfr > 0 && egfr < 30) {
+      criticalAlerts.push({
+        tag: 'ห้ามใช้ (eGFR < 30)',
+        drug: curMetformin.name,
+        text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min เสี่ยงต่อภาวะ Lactic Acidosis รุนแรงถึงแก่ชีวิต <b>ห้ามใช้ Metformin</b> (ควรหยุดยาทันที)`
+      });
+    } else if (egfr !== null && egfr >= 30 && egfr < 45) {
+      warningAlerts.push({
+        tag: 'ปรับลดขนาด (eGFR 30-44)',
+        drug: curMetformin.name,
+        text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min แนะนำปรับลดขนาดยาสูงสุดไม่เกิน <b>1,000 mg/วัน</b> (500 mg วันละ 2 ครั้ง) และติดตามค่าไตอย่างใกล้ชิด`
+      });
     }
-  } else if (cr && cr > 1.3) {
-    alerts.push(`• ⚠️ Serum Creatinine สูง (${cr} mg/dL): ควรประเมินขนาดยาที่ขับทางไต`);
+  } else if (egfr !== null && egfr > 0 && egfr < 45) {
+    if (egfr < 30) {
+      warningAlerts.push({
+        tag: 'ข้อห้ามใช้ Metformin',
+        drug: 'Metformin',
+        text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min (CKD Stage 4-5) <b>ห้ามเริ่มยา Metformin</b> เสี่ยงต่อ Lactic Acidosis`
+      });
+    } else {
+      warningAlerts.push({
+        tag: 'ปรับลดขนาดหากสั่งใช้',
+        drug: 'Metformin',
+        text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min หากจำเป็นต้องใช้ ควรจำกัดขนาดยาไม่เกิน 1,000 mg/วัน`
+      });
+    }
   }
 
-  if (alerts.length > 0) {
+  // 1.2 NSAIDs
+  const curNsaids = curMeds.filter(m => /ibuprofen|naproxen|diclofenac|meloxicam|celecoxib|piroxicam|mefenamic|indomethacin/i.test(m.name || ''));
+  if (curNsaids.length > 0) {
+    curNsaids.forEach(m => {
+      if ((egfr !== null && egfr > 0 && egfr < 30) || (cr !== null && cr >= 2.0)) {
+        criticalAlerts.push({
+          tag: 'ห้ามใช้ (ไตเสื่อมรุนแรง)',
+          drug: m.name,
+          text: `ผู้ป่วยมี eGFR ${egfr ? Math.round(egfr) : '-'} mL/min / Cr ${cr || '-'} mg/dL เสี่ยงภาวะไตวายเฉียบพลัน (AKI) รุนแรง <b>หลีกเลี่ยง NSAIDs เด็ดขาด</b> (แนะนำ Paracetamol หรือยาทาภายนอก)`
+        });
+      } else if (egfr !== null && egfr >= 30 && egfr < 60) {
+        warningAlerts.push({
+          tag: 'เฝ้าระวังไต (eGFR 30-59)',
+          drug: m.name,
+          text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min ควรหลีกเลี่ยงการใช้ต่อเนื่อง หากจำเป็นควรใช้ขนาดยาต่ำสุดและระยะเวลาสั้นที่สุด (ไม่เกิน 3-5 วัน)`
+        });
+      }
+    });
+
+    if (curNsaids.length >= 2) {
+      warningAlerts.push({
+        tag: 'NSAIDs ซ้ำซ้อน 2 ขนาน',
+        drug: curNsaids.map(m => m.name).join(' + '),
+        text: `สั่งใช้ยาแก้ปวดกลุ่ม NSAIDs พร้อมกัน 2 ตัว เพิ่มความเสี่ยงต่อแผลในทางเดินอาหาร เลือดออก และไตวายเฉียบพลัน`
+      });
+    }
+  } else if ((egfr !== null && egfr > 0 && egfr < 60) || (cr !== null && cr > 1.3)) {
+    warningAlerts.push({
+      tag: 'ระวังกลุ่มยา NSAIDs',
+      drug: 'NSAIDs Precautions',
+      text: `ผู้ป่วยมีภาวะการทำงานของไตลดลง (eGFR ${egfr ? Math.round(egfr) : '-'} / Cr ${cr || '-'}): ควรหลีกเลี่ยงการสั่งยาแก้ปวดกลุ่ม NSAIDs`
+    });
+  }
+
+  // 1.3 Colchicine
+  const curColchicine = curMeds.find(m => /colchicine/i.test(m.name || ''));
+  if (curColchicine && egfr !== null && egfr > 0 && egfr < 30) {
+    warningAlerts.push({
+      tag: 'ปรับลดขนาด (eGFR < 30)',
+      drug: curColchicine.name,
+      text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min ขนาดยาสูงสุดไม่เกิน <b>0.5 mg วันเว้นวัน</b> (หรือ 0.3 mg/วัน) เพื่อหลีกเลี่ยง Neuromyopathy และความเป็นพิษสะสม`
+    });
+  }
+
+  // 1.4 Allopurinol
+  const curAllopurinol = curMeds.find(m => /allopurinol/i.test(m.name || ''));
+  if (curAllopurinol && egfr !== null && egfr > 0 && egfr < 30) {
+    warningAlerts.push({
+      tag: 'ปรับลดขนาด (eGFR < 30)',
+      drug: curAllopurinol.name,
+      text: `ผู้ป่วยมี eGFR ${Math.round(egfr)} mL/min แนะนำเริ่มที่ <b>50-100 mg/วัน</b> เพื่อลดความเสี่ยงการเกิด Allopurinol Hypersensitivity Syndrome (AHS)`
+    });
+  }
+
+  // 1.5 Spironolactone
+  const curSpironolactone = curMeds.find(m => /spironolactone|aldactone/i.test(m.name || ''));
+  if (curSpironolactone) {
+    if ((egfr !== null && egfr > 0 && egfr < 30) || (kVal !== null && kVal >= 5.0)) {
+      criticalAlerts.push({
+        tag: 'ห้ามใช้ (เสี่ยง K สูงวิกฤต)',
+        drug: curSpironolactone.name,
+        text: `ผู้ป่วยมี eGFR ${egfr ? Math.round(egfr) : '-'} mL/min / Potassium ${kVal || '-'} mEq/L เสี่ยงต่อภาวะ <b>Severe Hyperkalemia</b> ที่เป็นอันตรายต่อชีวิต <b>ห้ามใช้ Spironolactone</b>`
+      });
+    }
+  }
+
+  // 2. Severe Drug-Drug Interactions (DDI)
+  // 2.1 Warfarin + NSAIDs / Tramadol
+  if (isOnWarfarin) {
+    const curBleedRisk = curMeds.filter(m => /ibuprofen|naproxen|diclofenac|meloxicam|celecoxib|piroxicam|mefenamic|indomethacin|tramadol/i.test(m.name || ''));
+    if (curBleedRisk.length > 0) {
+      curBleedRisk.forEach(m => {
+        criticalAlerts.push({
+          tag: 'อันตรกิริยารุนแรง (Warfarin + NSAID/Tramadol)',
+          drug: `Warfarin + ${m.name}`,
+          text: `สั่งใช้ <b>${escapeHtml(m.name)}</b> ร่วมกับ <b>WARFARIN</b> เสี่ยงเกิด <b>เลือดออกทางเดินอาหารรุนแรง (Major GI Bleeding)</b> และรบกวนการเกาะกลุ่มของเกล็ดเลือด`
+        });
+      });
+    } else {
+      infoAlerts.push({
+        tag: 'ผู้ป่วยได้รับ WARFARIN',
+        drug: 'Warfarin Precautions',
+        text: `ระวังการสั่งยาที่มีอันตรกิริยา เช่น NSAIDs, Tramadol, Fluoroquinolones, Macrolides, Azoles`
+      });
+    }
+  }
+
+  // 2.2 Dual RAAS Blockade (ACEI + ARB)
+  const aceiList = curMeds.filter(m => /enalapril|lisinopril|ramipril|captopril/i.test(m.name || ''));
+  const arbList = curMeds.filter(m => /losartan|valsartan|candesartan|telmisartan|irbesartan/i.test(m.name || ''));
+  if (aceiList.length > 0 && arbList.length > 0) {
+    criticalAlerts.push({
+      tag: 'ห้ามสั่งคู่กัน (Dual RAAS Blockade)',
+      drug: `${aceiList[0].name} + ${arbList[0].name}`,
+      text: `สั่งใช้ <b>ACEI (${escapeHtml(aceiList[0].name)})</b> ร่วมกับ <b>ARB (${escapeHtml(arbList[0].name)})</b> พร้อมกัน เพิ่มความเสี่ยง Hyperkalemia, ความดันโลหิตตก และไตวายเฉียบพลัน โดยไม่มีประโยชน์เสริม`
+    });
+  }
+
+  // 3. Therapeutic Duplication (ยาเดิมที่ได้รับในรอบ 30 วัน)
+  if (curMeds.length > 0 && past30Meds.length > 0) {
+    curMeds.forEach(curr => {
+      const cName = (curr.name || '').trim().toLowerCase();
+      const match = past30Meds.find(prev => {
+        if (curr.icode && prev.icode && String(curr.icode) === String(prev.icode)) return true;
+        const pName = (prev.name || '').trim().toLowerCase();
+        const cBase = cName.split(/\s|\(|\*/)[0];
+        const pBase = pName.split(/\s|\(|\*/)[0];
+        return cBase.length >= 4 && cBase === pBase;
+      });
+
+      if (match && match.daysAgo <= 20) {
+        warningAlerts.push({
+          tag: 'ยาซ้ำซ้อน 30 วัน',
+          drug: `${curr.name} ${curr.strength || ''}`,
+          text: `เพิ่งได้รับไปเมื่อ <b>${escapeHtml(match.vstdate_thai)} (${match.daysAgo} วันที่แล้ว)</b> จำนวน <b>${match.qty} ${escapeHtml(match.units || 'เม็ด')}</b> อาจมียาเดิมเหลืออยู่ โปรดตรวจสอบก่อนสั่งซ้ำ`
+        });
+      }
+    });
+  }
+
+  // Render alerts into Box
+  const allAlerts = [...criticalAlerts, ...warningAlerts, ...infoAlerts];
+  if (allAlerts.length > 0) {
     drugAlertBox.style.display = 'flex';
-    drugTitle.textContent = 'คำเตือนความปลอดภัยด้านยา (Drug Safety Alerts)';
-    drugDesc.textContent = alerts.join('\n');
+    const alertIconEl = drugAlertBox.querySelector('.alert-icon');
+    if (criticalAlerts.length > 0) {
+      drugAlertBox.className = 'alert-box alert-danger';
+      if (alertIconEl) alertIconEl.textContent = '🚨';
+      drugTitle.textContent = 'แจ้งเตือนความปลอดภัยด้านยาวิกฤต (Critical Drug Alerts)';
+    } else if (warningAlerts.length > 0) {
+      drugAlertBox.className = 'alert-box alert-warning';
+      if (alertIconEl) alertIconEl.textContent = '⚠️';
+      drugTitle.textContent = 'ข้อควรระวังเรื่องยา & ปรับขนาดยา (Drug Safety & Renal Dosing)';
+    } else {
+      drugAlertBox.className = 'alert-box alert-warning';
+      if (alertIconEl) alertIconEl.textContent = 'ℹ️';
+      drugTitle.textContent = 'ข้อมูลความปลอดภัยด้านยา (Medication Precautions)';
+    }
+
+    drugDesc.innerHTML = `
+      <div class="drug-alert-list">
+        ${allAlerts.map(a => `
+          <div class="drug-alert-item ${a.tag.includes('ห้ามใช้') || a.tag.includes('วิกฤต') || a.tag.includes('รุนแรง') || a.tag.includes('ห้ามสั่ง') ? 'drug-alert-danger' : (a.tag.includes('WARFARIN') ? 'drug-alert-info' : 'drug-alert-warn')}">
+            <div class="drug-alert-badge-row">
+              <span class="drug-badge">${escapeHtml(a.tag)}</span>
+              <b class="drug-name-head">${escapeHtml(a.drug)}</b>
+            </div>
+            <div class="drug-desc-text">${a.text}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   } else {
     drugAlertBox.style.display = 'none';
   }
@@ -2458,7 +2646,14 @@ window.loadMoreHistory = function() {
 
 window.openLabHistory = function(labName) {
   if (!labName) return;
-  const displayTitle = (/^hematocrit\d*$|^hct\d*$/i.test(labName)) ? 'Hct (Hematocrit)' : labName;
+  const lKey = String(labName).toLowerCase().trim();
+  let displayTitle = labName;
+  if (/^hematocrit\d*$|^hct\d*$/i.test(lKey)) displayTitle = 'Hct (Hematocrit)';
+  else if (lKey === 'hba1c' || lKey === 'a1c') displayTitle = 'HbA1c (น้ำตาลสะสม)';
+  else if (lKey === 'cr' || lKey === 'creatinine') displayTitle = 'Creatinine (การทำงานของไต)';
+  else if (lKey === 'ldl') displayTitle = 'LDL-C (ไขมันเลว)';
+  else if (lKey === 'uacr') displayTitle = 'uACR (โปรตีนรั่วในปัสสาวะ)';
+  else if (lKey === 'potassium' || lKey === 'k') displayTitle = 'Potassium (K)';
   openHistoryModal('lab_' + labName, `ประวัติผลตรวจแล็บ: ${displayTitle}`, 'ติดตามแนวโน้มผลตรวจทางห้องปฏิบัติการย้อนหลัง');
 };
 
@@ -2493,6 +2688,10 @@ async function fetchAndRenderHistory(type, limit) {
                            (/^platelet|^plt/i.test(rawLabKey)) ? 'platelet' :
                            (/^potassium|^k$/i.test(rawLabKey)) ? 'potassium' :
                            (/^sodium|^na$/i.test(rawLabKey)) ? 'sodium' :
+                           (/^creatinine|^cr$/i.test(rawLabKey)) ? 'cr' :
+                           (/^hba1c|^a1c$/i.test(rawLabKey)) ? 'hba1c' :
+                           (/^ldl/i.test(rawLabKey)) ? 'ldl' :
+                           (/^uacr/i.test(rawLabKey)) ? 'uacr' :
                            rawLabKey;
       labChipsBar.querySelectorAll('.btn-toggle-pill').forEach(btn => {
         const key = (btn.dataset.lab || '').toLowerCase();
@@ -3692,7 +3891,13 @@ function renderHistoryTrendChart(type, data) {
   } else if (type.startsWith('lab_')) {
     const rawTarget = type.replace('lab_', '').trim();
     const targetKey = rawTarget.toLowerCase();
-    const displayTargetName = (/^hematocrit\d*$|^hct\d*$/i.test(targetKey)) ? 'HCT (HEMATOCRIT)' : rawTarget.toUpperCase();
+    const displayTargetName = (/^hematocrit\d*$|^hct\d*$/i.test(targetKey)) ? 'HCT (HEMATOCRIT)' :
+                              (targetKey === 'ldl') ? 'LDL-C (ไขมันเลว)' :
+                              (targetKey === 'uacr') ? 'uACR (โปรตีนรั่วในปัสสาวะ)' :
+                              (targetKey === 'hba1c' || targetKey === 'a1c') ? 'HbA1c (น้ำตาลสะสม)' :
+                              (targetKey === 'cr' || targetKey === 'creatinine') ? 'CREATININE (ค่าไต)' :
+                              (targetKey === 'potassium' || targetKey === 'k') ? 'POTASSIUM (K)' :
+                              rawTarget.toUpperCase();
     title = `แนวโน้มผลตรวจทางห้องปฏิบัติการ: ${displayTargetName}`;
     const chrono = [...data].reverse();
 
@@ -3716,13 +3921,17 @@ function renderHistoryTrendChart(type, data) {
         const isAstMatch = (/ast|sgot/i.test(itemLower) && /ast|sgot/i.test(targetKey));
         const isAltMatch = (/alt|sgpt/i.test(itemLower) && /alt|sgpt/i.test(targetKey));
         const isCrMatch = (/creatinine|^cr\b/i.test(itemLower) && /creatinine|^cr\b/i.test(targetKey));
+        const isLdlMatch = (/^ldl|cholesterol.*ldl/i.test(itemLower) && /ldl/i.test(targetKey));
+        const isUacrMatch = (/uacr|microalbumin/i.test(itemLower) && /uacr|microalbumin/i.test(targetKey));
+        const isA1cMatch = (/a1c|hba1c/i.test(itemLower) && /a1c|hba1c/i.test(targetKey));
 
-        const matchesTarget = isHctMatch || isKMatch || isNaMatch || isPltMatch || isAstMatch || isAltMatch || isCrMatch ||
+        const matchesTarget = isHctMatch || isKMatch || isNaMatch || isPltMatch || isAstMatch || isAltMatch || isCrMatch || isLdlMatch || isUacrMatch || isA1cMatch ||
           itemLower.includes(targetKey) || targetKey.includes(itemLower);
 
         if (!matchesTarget) return;
         if (targetKey === 'wbc' && (itemLower.includes('ua') || itemLower.includes('urine'))) return;
         if (targetKey === 'k' && itemLower.includes('gap')) return;
+        if (targetKey === 'ldl' && !itemLower.includes('ldl')) return;
       }
 
       // สำหรับ Hct ให้จัดกลุ่มรวมทั้ง Hematocrit และ Hematocrit2 เพื่อพล็อตเป็นเส้นแนวโน้มเดียวกัน
@@ -3775,6 +3984,12 @@ function renderHistoryTrendChart(type, data) {
           }
           if (grp.normMax !== null && !isNaN(grp.normMax)) {
             refLines.push({ yVal: grp.normMax, yAxis: 'primary', label: `สูงสุด (${grp.normMax})`, color: '#ef4444' });
+          } else if (targetKey === 'ldl') {
+            refLines.push({ yVal: 100, yAxis: 'primary', label: 'เกณฑ์ปกติ (<100)', color: '#10b981' });
+          } else if (targetKey === 'hba1c' || targetKey === 'a1c') {
+            refLines.push({ yVal: 7.0, yAxis: 'primary', label: 'เป้าหมาย DM (7.0%)', color: '#d97706' });
+          } else if (targetKey === 'uacr') {
+            refLines.push({ yVal: 30, yAxis: 'primary', label: 'Microalbuminuria (30)', color: '#d97706' });
           }
         }
         sIdx++;

@@ -107,6 +107,25 @@ SMTO_NORMAL = 0x0000
 GW_CHILD = 5
 GW_HWNDNEXT = 2
 
+class GUITHREADINFO(ctypes.Structure):
+    _fields_ = [
+        ('cbSize', wintypes.DWORD),
+        ('flags', wintypes.DWORD),
+        ('hwndActive', wintypes.HWND),
+        ('hwndFocus', wintypes.HWND),
+        ('hwndCapture', wintypes.HWND),
+        ('hwndMenuOwner', wintypes.HWND),
+        ('hwndMoveSize', wintypes.HWND),
+        ('hwndCaret', wintypes.HWND),
+        ('rcCaret', wintypes.RECT)
+    ]
+
+try:
+    user32.GetGUIThreadInfo.argtypes = [wintypes.DWORD, ctypes.POINTER(GUITHREADINFO)]
+    user32.GetGUIThreadInfo.restype = wintypes.BOOL
+except Exception:
+    pass
+
 _initialized_threads = set()
 
 def ensure_default_desktop():
@@ -159,20 +178,11 @@ def get_control_text(hwnd):
 
         result = wintypes.DWORD()
 
-        # 1. พยายามอ่านโดยตรงผ่าน SendMessageTimeoutW (WM_GETTEXT) บัฟเฟอร์ 512 ตัวอักษร
-        buf_w = ctypes.create_unicode_buffer(512)
-        ok_w = user32.SendMessageTimeoutW(
-            hwnd, WM_GETTEXT, 512, ctypes.cast(buf_w, ctypes.c_void_p),
-            SMTO_ABORTIFHUNG, 35, ctypes.byref(result)
-        )
-        if ok_w and buf_w.value and len(buf_w.value.strip()) > 0:
-            return buf_w.value.strip()
-
-        # 2. พยายามอ่านโดยตรงผ่าน SendMessageTimeoutA (WM_GETTEXT แบบ CP874) สำหรับ Delphi ANSI
+        # 1. พยายามอ่านโดยตรงผ่าน SendMessageTimeoutA (WM_GETTEXT แบบ CP874) สำหรับ Delphi ANSI (HOSxP 3.x)
         buf_a = ctypes.create_string_buffer(512)
         ok_a = user32.SendMessageTimeoutA(
             hwnd, WM_GETTEXT, 512, ctypes.cast(buf_a, ctypes.c_void_p),
-            SMTO_ABORTIFHUNG, 35, ctypes.byref(result)
+            0, 80, ctypes.byref(result)
         )
         if ok_a and buf_a.value:
             try:
@@ -187,12 +197,16 @@ def get_control_text(hwnd):
                 except Exception:
                     pass
 
-        # 3. Fallback ผ่าน GetWindowTextW
-        user32.GetWindowTextW(hwnd, buf_w, 512)
-        if buf_w.value and len(buf_w.value.strip()) > 0:
+        # 2. พยายามอ่านโดยตรงผ่าน SendMessageTimeoutW (WM_GETTEXT) สำหรับ Windows Controls มาตรฐาน
+        buf_w = ctypes.create_unicode_buffer(512)
+        ok_w = user32.SendMessageTimeoutW(
+            hwnd, WM_GETTEXT, 512, ctypes.cast(buf_w, ctypes.c_void_p),
+            0, 80, ctypes.byref(result)
+        )
+        if ok_w and buf_w.value and len(buf_w.value.strip()) > 0:
             return buf_w.value.strip()
 
-        # 4. Fallback ผ่าน GetWindowTextA (CP874)
+        # 3. Fallback ผ่าน GetWindowTextA (CP874)
         user32.GetWindowTextA(hwnd, buf_a, 512)
         if buf_a.value:
             try:
@@ -201,6 +215,11 @@ def get_control_text(hwnd):
                     return t
             except Exception:
                 pass
+
+        # 4. Fallback ผ่าน GetWindowTextW
+        user32.GetWindowTextW(hwnd, buf_w, 512)
+        if buf_w.value and len(buf_w.value.strip()) > 0:
+            return buf_w.value.strip()
 
     except Exception:
         pass
@@ -488,30 +507,45 @@ def get_hosxp_live_typing_text():
     ensure_default_desktop()
     found_typing = ""
     try:
-        fore_hwnd = user32.GetForegroundWindow()
-        if fore_hwnd:
-            pid = wintypes.DWORD()
-            tid = user32.GetWindowThreadProcessId(fore_hwnd, ctypes.byref(pid))
-            if pid.value:
-                hProc = kernel32.OpenProcess(0x1000, False, pid.value)
-                if hProc:
-                    buf = ctypes.create_unicode_buffer(512)
-                    sz = wintypes.DWORD(512)
-                    if kernel32.QueryFullProcessImageNameW(hProc, 0, buf, ctypes.byref(sz)):
-                        val = buf.value.lower()
-                        if any(proc in val for proc in ['hosmy.exe', 'hosxp.exe', 'hosxp_pcu.exe']):
-                            cur_tid = kernel32.GetCurrentThreadId()
-                            user32.AttachThreadInput(cur_tid, tid, True)
-                            focus = user32.GetFocus()
-                            user32.AttachThreadInput(cur_tid, tid, False)
-                            if focus:
-                                txt = get_control_text(focus)
-                                if txt and len(txt.strip()) >= 2:
-                                    # กรองตัวเลขล้วน หรือคำสั่งระบบ
-                                    clean = txt.strip()
-                                    if not clean.isdigit() and len(clean) <= 100:
-                                        found_typing = clean
-                    kernel32.CloseHandle(hProc)
+        # 1. ค้นหาหน้าต่าง HOSxP ใน Session ปัจจุบัน
+        hos_windows = []
+        def enum_cb(h, lp):
+            if user32.IsWindowVisible(h):
+                cls = get_class_name(h)
+                if 'TDoctorDeskForm' in cls or 'TMainForm' in cls:
+                    hos_windows.append((h, cls))
+            return True
+        user32.EnumWindows(WNDENUMPROC(enum_cb), 0)
+
+        # 2. ตรวจสอบ Control ที่มี Focus / Caret ผ่าน GetGUIThreadInfo
+        for h, cls in hos_windows:
+            tid = user32.GetWindowThreadProcessId(h, None)
+            gui = GUITHREADINFO()
+            gui.cbSize = ctypes.sizeof(GUITHREADINFO)
+            if user32.GetGUIThreadInfo(tid, ctypes.byref(gui)):
+                target = gui.hwndFocus or gui.hwndCaret
+                if target:
+                    t = get_control_text(target)
+                    if t and len(t) >= 1 and not t.isdigit() and len(t) <= 200:
+                        return t.strip()
+
+        # 3. หากยังไม่ได้พิมพ์ใน Focus Control (เช่น สลับหน้าต่างมาชั่วคราว หรือคลิกบนแท็บ)
+        # ตรวจสอบหา Visible Clinical Memo / Edit บน TDoctorDeskForm (เช่น แท็บ CC, HPI, PE, หรือการวินิจฉัย ที่เปิดมองเห็นอยู่)
+        for h, cls in hos_windows:
+            if 'TDoctorDeskForm' in cls:
+                visible_texts = []
+                def cb_child(ch, lp):
+                    cname = get_class_name(ch)
+                    if any(m in cname.lower() for m in ['memo', 'richedit', 'dxmemo']):
+                        if user32.IsWindowVisible(ch):
+                            txt = get_control_text(ch)
+                            if txt and not txt.isdigit() and len(txt) <= 200:
+                                visible_texts.append(txt.strip())
+                    return True
+                user32.EnumChildWindows(h, WNDENUMPROC(cb_child), 0)
+                if visible_texts:
+                    return visible_texts[0]
+
     except Exception:
         pass
     return found_typing

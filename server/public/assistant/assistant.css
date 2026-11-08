@@ -672,9 +672,77 @@ body {
   border: 1px solid #fde68a;
   color: #92400e;
 }
+.alert-danger {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
 .alert-icon {
   font-size: 16px;
   flex-shrink: 0;
+}
+.drug-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 5px;
+}
+.drug-alert-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.drug-alert-item.drug-alert-danger {
+  background: #fff1f2;
+  border-left: 3.5px solid #e11d48;
+  color: #881337;
+}
+.drug-alert-item.drug-alert-warn {
+  background: #fffbeb;
+  border-left: 3.5px solid #f59e0b;
+  color: #78350f;
+}
+.drug-alert-item.drug-alert-info {
+  background: #f0fdf4;
+  border-left: 3.5px solid #10b981;
+  color: #065f46;
+}
+.drug-alert-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.drug-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.drug-alert-danger .drug-badge {
+  background: #ffe4e6;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+.drug-alert-warn .drug-badge {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.drug-alert-info .drug-badge {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.drug-name-head {
+  font-size: 12px;
+  font-weight: 700;
+}
+.drug-desc-text {
+  font-size: 11.5px;
+  color: inherit;
 }
 
 .herb-suggestions {
@@ -2623,11 +2691,22 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
 }
 .care-gap-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-size: 12px;
   color: #78350f;
   line-height: 1.45;
+  padding: 4px 6px;
+  background: rgba(254, 240, 138, 0.25);
+  border-radius: 6px;
+}
+.care-gap-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 .care-gap-tag {
   background: #fef08a;
@@ -2639,6 +2718,28 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
   font-size: 10.5px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+.btn-gap-chart {
+  background: #fff;
+  border: 1px solid #d97706;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.btn-gap-chart:hover {
+  background: #fef3c7;
+  border-color: #b45309;
+  color: #92400e;
 }
 
 /* ─── Recent Medications in 30 days Card ─── */

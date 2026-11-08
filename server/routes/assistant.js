@@ -171,16 +171,30 @@ router.post('/notify-patient', express.json({ limit: '32kb' }), (req, res) => {
   const sessionActive = body.session_active === true && Boolean(String(body.user || '').trim());
   const previous = activePatients.get(ip) || {};
   const isClick = body.trigger === 'click' || body.click_id;
+  const newVn = sessionActive ? String(body.vn || '') : '';
+  const newHn = sessionActive ? String(body.hn || '') : '';
+  const patientChanged = (previous.vn || '') !== newVn || (previous.hn || '') !== newHn;
+
+  let liveDiag = '';
+  if (patientChanged) {
+    // เปลี่ยนคนไข้ใหม่ ให้เคลียร์ข้อความพิมพ์สดของคนไข้เดิมทันที
+    liveDiag = String(body.live_diag || '');
+  } else if (body.live_diag !== undefined) {
+    // ส่ง live_diag มา ไม่ว่าจะเป็นคำใหม่ หรือข้อความว่าง '' ให้อัปเดตตามจริง
+    liveDiag = String(body.live_diag || '');
+  } else {
+    liveDiag = String(previous.live_diag || '');
+  }
+
   const state = {
-    vn: sessionActive ? String(body.vn || '') : '', hn: sessionActive ? String(body.hn || '') : '', user: sessionActive ? String(body.user || '').slice(0, 100) : '',
-    live_diag: String(body.live_diag || previous.live_diag || ''),
+    vn: newVn, hn: newHn, user: sessionActive ? String(body.user || '').slice(0, 100) : '',
+    live_diag: liveDiag,
     computer: String(companionAuth.deviceName || body.computer || '').slice(0, 100), device_id: companionAuth.deviceId || '', session_active: sessionActive,
     last_click_id: Number(body.click_id) || (isClick ? Date.now() : previous.last_click_id || 0),
     last_click_vn: isClick ? String(body.vn || '') : previous.last_click_vn || '',
     timestamp: Date.now()
   };
   const sessionChanged = Boolean(previous.session_active) !== sessionActive || (sessionActive && previous.user !== state.user);
-  const patientChanged = (previous.vn || '') !== state.vn || (previous.hn || '') !== state.hn;
   activePatients.set(ip, state);
   const sessions = req.app.get('companionSessions');
   if (sessionActive) sessions.set(ip, { active: true, user: state.user, computer: state.computer, deviceId: state.device_id, timestamp: state.timestamp });
@@ -408,7 +422,7 @@ router.get('/visit-data/:vn', async (req, res) => {
       console.warn('[assistant] Readmission 28d check error:', ipdErr.code || ipdErr.name || 'error');
     }
 
-    // 2. Chronic Care Gap (DM HbA1c in 6 months, UACR in 1 year)
+    // 2. Chronic Care Gap (DM, HT, CKD ติดตามผลแล็บสำคัญครบวงจร)
     let careGap = { hasGap: false, gaps: [] };
     try {
       const [clinics] = await db.execute(`
@@ -418,19 +432,39 @@ router.get('/visit-data/:vn', async (req, res) => {
         WHERE cm.hn = ? AND (cm.dchdate IS NULL OR cm.dchdate = '')
       `, [visit.hn]);
 
-      const isDm = clinics.some(c => String(c.clinic) === '001' || /เบาหวาน|dm\b/i.test(c.clinic_name));
-      const isHt = clinics.some(c => String(c.clinic) === '002' || /ความดัน|ht\b/i.test(c.clinic_name));
+      const isDmClinic = clinics.some(c => String(c.clinic) === '001' || /เบาหวาน|dm\b/i.test(c.clinic_name));
+      const isHtClinic = clinics.some(c => String(c.clinic) === '002' || /ความดัน|ht\b/i.test(c.clinic_name));
+      const isCkdClinic = clinics.some(c => /ckd|ไต/i.test(c.clinic_name));
 
-      let hasDmDx = isDm, hasHtDx = isHt;
-      if (!isDm || !isHt) {
+      let hasDmDx = isDmClinic, hasHtDx = isHtClinic, hasCkdDx = isCkdClinic;
+      if (!isDmClinic || !isHtClinic || !hasCkdDx) {
         const [pastDx] = await db.execute(`
-          SELECT icd10 FROM ovstdiag WHERE hn = ? AND (icd10 LIKE 'E10%' OR icd10 LIKE 'E11%' OR icd10 LIKE 'E14%' OR icd10 LIKE 'I10%')
-          LIMIT 10
+          SELECT icd10 FROM ovstdiag WHERE hn = ? AND (
+            icd10 LIKE 'E10%' OR icd10 LIKE 'E11%' OR icd10 LIKE 'E14%'
+            OR icd10 LIKE 'I10%'
+            OR icd10 LIKE 'N18%'
+          )
+          LIMIT 15
         `, [visit.hn]);
         if (pastDx.some(d => d.icd10?.startsWith('E'))) hasDmDx = true;
         if (pastDx.some(d => d.icd10?.startsWith('I10'))) hasHtDx = true;
+        if (pastDx.some(d => d.icd10?.startsWith('N18'))) hasCkdDx = true;
       }
 
+      const egfrVal = Number(screening.egfr || 0);
+      if (egfrVal > 0 && egfrVal < 60) {
+        hasCkdDx = true;
+      }
+
+      // รหัสแล็บจาก config (พร้อม fallback ตามมาตรฐานโรงพยาบาล)
+      const trendCodes = getConfig()?.schema?.labTrendCodes || {};
+      const hba1cCodes = Array.isArray(trendCodes.hba1c) && trendCodes.hba1c.length ? trendCodes.hba1c : ['185'];
+      const ldlCodes = Array.isArray(trendCodes.ldl) && trendCodes.ldl.length ? trendCodes.ldl : ['160', '1886'];
+      const crCodes = Array.isArray(trendCodes.cr) && trendCodes.cr.length ? trendCodes.cr : ['155'];
+      const uacrCodes = Array.isArray(trendCodes.uacr) && trendCodes.uacr.length ? trendCodes.uacr : ['199', '1985'];
+      const kCodes = Array.isArray(trendCodes.potassium) && trendCodes.potassium.length ? trendCodes.potassium : ['173'];
+
+      // 2.1 HbA1c: สำหรับผู้ป่วยเบาหวาน (เกณฑ์: ทุก 6 เดือน / 180 วัน)
       if (hasDmDx) {
         const [hba1cRows] = await db.execute(`
           SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
@@ -439,11 +473,11 @@ router.get('/visit-data/:vn', async (req, res) => {
           JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
           JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
           WHERE lh.hn = ?
-            AND (li.lab_items_name LIKE '%a1c%' OR li.lab_items_name LIKE '%HbA1c%')
+            AND (lo.lab_items_code IN (${hba1cCodes.map(() => '?').join(',')}) OR li.lab_items_name LIKE '%a1c%' OR li.lab_items_name LIKE '%HbA1c%')
             AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
           ORDER BY lh.order_date DESC
           LIMIT 1
-        `, [visit.vstdate, visit.hn]);
+        `, [visit.vstdate, visit.hn, ...hba1cCodes]);
 
         if (!hba1cRows[0]) {
           careGap.gaps.push({
@@ -470,8 +504,88 @@ router.get('/visit-data/:vn', async (req, res) => {
         }
       }
 
-      const isCkd = Number(screening.egfr || 0) > 0 && Number(screening.egfr || 0) < 60;
-      if (hasDmDx || hasHtDx || isCkd) {
+      // 2.2 LDL-C: สำหรับผู้ป่วยเบาหวานหรือความดันโลหิตสูง (เกณฑ์: ทุก 1 ปี / 365 วัน)
+      if (hasDmDx || hasHtDx) {
+        const [ldlRows] = await db.execute(`
+          SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                 DATEDIFF(?, lh.order_date) AS days_ago
+          FROM lab_head lh
+          JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+          JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+          WHERE lh.hn = ?
+            AND (lo.lab_items_code IN (${ldlCodes.map(() => '?').join(',')}) OR li.lab_items_name LIKE '%ldl%')
+            AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+          ORDER BY lh.order_date DESC
+          LIMIT 1
+        `, [visit.vstdate, visit.hn, ...ldlCodes]);
+
+        if (!ldlRows[0]) {
+          careGap.gaps.push({
+            type: 'ldl',
+            label: 'LDL-C (ไขมันเลว)',
+            reason: 'ไม่พบประวัติตรวจ LDL ในระบบ',
+            daysAgo: null,
+            lastDate: null,
+            lastValue: null,
+            severity: 'warn'
+          });
+        } else if (Number(ldlRows[0].days_ago) > 365) {
+          const days = Number(ldlRows[0].days_ago);
+          const months = Math.floor(days / 30);
+          careGap.gaps.push({
+            type: 'ldl',
+            label: 'LDL-C (ไขมันเลว)',
+            reason: `ไม่ได้ตรวจเกิน 1 ปี (${months} เดือน, เกณฑ์: ทุกปี)`,
+            daysAgo: days,
+            lastDate: thaiDate(ldlRows[0].order_date),
+            lastValue: `${ldlRows[0].lab_order_result} mg/dL`,
+            severity: 'warn'
+          });
+        }
+      }
+
+      // 2.3 Creatinine / eGFR: สำหรับเบาหวาน ความดัน หรือผู้ป่วยไตเรื้อรัง (เกณฑ์: ทุก 1 ปี / 365 วัน)
+      if (hasDmDx || hasHtDx || hasCkdDx) {
+        const [crRows] = await db.execute(`
+          SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                 DATEDIFF(?, lh.order_date) AS days_ago
+          FROM lab_head lh
+          JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+          JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+          WHERE lh.hn = ?
+            AND (lo.lab_items_code IN (${crCodes.map(() => '?').join(',')}) OR li.lab_items_name LIKE '%creatinine%')
+            AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+          ORDER BY lh.order_date DESC
+          LIMIT 1
+        `, [visit.vstdate, visit.hn, ...crCodes]);
+
+        if (!crRows[0]) {
+          careGap.gaps.push({
+            type: 'cr',
+            label: 'Creatinine / eGFR (ไต)',
+            reason: 'ไม่พบประวัติตรวจ Creatinine ในระบบ',
+            daysAgo: null,
+            lastDate: null,
+            lastValue: null,
+            severity: 'warn'
+          });
+        } else if (Number(crRows[0].days_ago) > 365) {
+          const days = Number(crRows[0].days_ago);
+          const months = Math.floor(days / 30);
+          careGap.gaps.push({
+            type: 'cr',
+            label: 'Creatinine / eGFR (ไต)',
+            reason: `ไม่ได้ตรวจเกิน 1 ปี (${months} เดือน, เกณฑ์: ทุกปี)`,
+            daysAgo: days,
+            lastDate: thaiDate(crRows[0].order_date),
+            lastValue: `${crRows[0].lab_order_result} mg/dL`,
+            severity: 'warn'
+          });
+        }
+      }
+
+      // 2.4 UACR: สำหรับเบาหวาน ความดัน หรือ CKD (เกณฑ์: ทุก 1 ปี / 365 วัน)
+      if (hasDmDx || hasHtDx || hasCkdDx) {
         const [uacrRows] = await db.execute(`
           SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
                  DATEDIFF(?, lh.order_date) AS days_ago
@@ -479,22 +593,51 @@ router.get('/visit-data/:vn', async (req, res) => {
           JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
           JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
           WHERE lh.hn = ?
-            AND (li.lab_items_name LIKE '%uacr%' OR li.lab_items_name LIKE '%microalbumin%')
+            AND (lo.lab_items_code IN (${uacrCodes.map(() => '?').join(',')}) OR li.lab_items_name LIKE '%uacr%' OR li.lab_items_name LIKE '%microalbumin%')
             AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
           ORDER BY lh.order_date DESC
           LIMIT 1
-        `, [visit.vstdate, visit.hn]);
+        `, [visit.vstdate, visit.hn, ...uacrCodes]);
 
         if (!uacrRows[0]) {
-          careGap.gaps.push({
-            type: 'uacr',
-            label: 'UACR (โปรตีนรั่วในปัสสาวะ)',
-            reason: 'ไม่พบประวัติตรวจ UACR ในระบบ',
-            daysAgo: null,
-            lastDate: null,
-            lastValue: null,
-            severity: 'info'
-          });
+          // Fallback: ตรวจสอบประวัติ Albumin(UA) จากการตรวจปัสสาวะทั่วไป (รหัส 100)
+          const [uaRows] = await db.execute(`
+            SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                   DATEDIFF(?, lh.order_date) AS days_ago
+            FROM lab_head lh
+            JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+            JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+            WHERE lh.hn = ?
+              AND lo.lab_items_code = 100
+              AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+            ORDER BY lh.order_date DESC
+            LIMIT 1
+          `, [visit.vstdate, visit.hn]);
+
+          if (uaRows[0] && Number(uaRows[0].days_ago) <= 365) {
+            const isPos = /positive|\+/i.test(uaRows[0].lab_order_result);
+            careGap.gaps.push({
+              type: 'uacr',
+              label: 'uACR (โปรตีนรั่วในปัสสาวะ)',
+              reason: isPos
+                ? `พบโปรตีนรั่วใน UA (${uaRows[0].lab_order_result}) เมื่อ ${thaiDate(uaRows[0].order_date)} (แนะนำตรวจ uACR ซ้ำ)`
+                : `ตรวจ UA ทั่วไป (${uaRows[0].lab_order_result}) เมื่อ ${thaiDate(uaRows[0].order_date)} (เกณฑ์: ควรตรวจ uACR ทุกปี)`,
+              daysAgo: Number(uaRows[0].days_ago),
+              lastDate: thaiDate(uaRows[0].order_date),
+              lastValue: `UA: ${uaRows[0].lab_order_result}`,
+              severity: isPos ? 'warn' : 'info'
+            });
+          } else {
+            careGap.gaps.push({
+              type: 'uacr',
+              label: 'uACR (โปรตีนรั่วในปัสสาวะ)',
+              reason: 'ไม่พบประวัติตรวจ uACR หรือโปรตีนในปัสสาวะในรอบ 1 ปี',
+              daysAgo: null,
+              lastDate: null,
+              lastValue: null,
+              severity: 'info'
+            });
+          }
         } else if (Number(uacrRows[0].days_ago) > 365) {
           const days = Number(uacrRows[0].days_ago);
           careGap.gaps.push({
@@ -505,6 +648,45 @@ router.get('/visit-data/:vn', async (req, res) => {
             lastDate: thaiDate(uacrRows[0].order_date),
             lastValue: uacrRows[0].lab_order_result,
             severity: 'info'
+          });
+        }
+      }
+
+      // 2.5 Potassium (K): สำหรับผู้ป่วยไตวายรุนแรง Stage 4-5 (eGFR < 30) (เกณฑ์: ทุก 6 เดือน / 180 วัน)
+      if (hasCkdDx && egfrVal > 0 && egfrVal < 30) {
+        const [kRows] = await db.execute(`
+          SELECT DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date, lo.lab_order_result, li.lab_items_name,
+                 DATEDIFF(?, lh.order_date) AS days_ago
+          FROM lab_head lh
+          JOIN lab_order lo ON lh.lab_order_number = lo.lab_order_number
+          JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+          WHERE lh.hn = ?
+            AND (lo.lab_items_code IN (${kCodes.map(() => '?').join(',')}) OR (li.lab_items_name LIKE '%potassium%' AND li.lab_items_name NOT LIKE '%gap%'))
+            AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+          ORDER BY lh.order_date DESC
+          LIMIT 1
+        `, [visit.vstdate, visit.hn, ...kCodes]);
+
+        if (!kRows[0]) {
+          careGap.gaps.push({
+            type: 'potassium',
+            label: 'Potassium (K) ในไตเสื่อมขั้นรุนแรง',
+            reason: 'ไม่พบประวัติตรวจ Potassium ในระบบ (eGFR < 30)',
+            daysAgo: null,
+            lastDate: null,
+            lastValue: null,
+            severity: 'warn'
+          });
+        } else if (Number(kRows[0].days_ago) > 180) {
+          const days = Number(kRows[0].days_ago);
+          careGap.gaps.push({
+            type: 'potassium',
+            label: 'Potassium (K) ในไตเสื่อมขั้นรุนแรง',
+            reason: `ไม่ได้ตรวจเกิน ${Math.floor(days / 30)} เดือน (เกณฑ์: ทุก 6 เดือนใน eGFR < 30)`,
+            daysAgo: days,
+            lastDate: thaiDate(kRows[0].order_date),
+            lastValue: `${kRows[0].lab_order_result} mEq/L`,
+            severity: 'warn'
           });
         }
       }
@@ -838,7 +1020,9 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
     plt: 'platelet',
     'platelet count': 'platelet',
     sgot: 'ast',
-    sgpt: 'alt'
+    sgpt: 'alt',
+    creatinine: 'cr',
+    a1c: 'hba1c'
   };
   const type = typeAliases[rawType] || rawType;
   const matches = {
@@ -848,7 +1032,7 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
     fbs: "(li.lab_items_name LIKE '%FBS%' OR li.lab_items_name LIKE '%Glucose%' OR li.lab_items_name LIKE '%FPG%')",
     ldl: "(li.lab_items_name LIKE '%LDL%' OR li.lab_items_name LIKE '%Low density%')",
     hct: "(li.lab_items_name LIKE '%Hematocrit%' OR li.lab_items_name LIKE '%Hct%')",
-    uacr: "(li.lab_items_name LIKE '%UACR%' OR li.lab_items_name LIKE '%Albumin Creatinine Ratio%' OR li.lab_items_name LIKE '%Urine ACR%')",
+    uacr: "(li.lab_items_name LIKE '%UACR%' OR li.lab_items_name LIKE '%Albumin Creatinine Ratio%' OR li.lab_items_name LIKE '%Urine ACR%' OR li.lab_items_name LIKE '%Microalbumin%')",
     k: "((li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%') AND li.lab_items_name NOT LIKE '%gap%')",
     potassium: "((li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%') AND li.lab_items_name NOT LIKE '%gap%')",
     na: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
