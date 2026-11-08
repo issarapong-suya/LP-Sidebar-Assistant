@@ -53,8 +53,9 @@ function setAssistantSessionActive(active, user = '', authMode = '') {
     const name = document.getElementById('patientName'); if (name) name.textContent = 'รอคนไข้จาก HOSxP...';
     const hn = document.getElementById('patientHnBadge'); if (hn) hn.textContent = 'HN -';
     const vn = document.getElementById('patientVn'); if (vn) vn.textContent = '-';
+    const vnDt = document.getElementById('patientVnDatetime'); if (vnDt) { vnDt.textContent = ''; vnDt.style.display = 'none'; }
     const ccRow = document.getElementById('patientCcRow'); if (ccRow) ccRow.style.display = 'none';
-    const erBanner = document.getElementById('erRevisitBanner'); if (erBanner) erBanner.style.display = 'none'; const readmBanner = document.getElementById('readmissionBanner'); if (readmBanner) readmBanner.style.display = 'none'; const gapBanner = document.getElementById('careGapBanner'); if (gapBanner) gapBanner.style.display = 'none'; const recMedsCard = document.getElementById('recentMedsCard'); if (recMedsCard) recMedsCard.style.display = 'none';
+    const erBanner = document.getElementById('erRevisitBanner'); if (erBanner) erBanner.style.display = 'none'; const readmBanner = document.getElementById('readmissionBanner'); if (readmBanner) readmBanner.style.display = 'none'; const gapBanner = document.getElementById('careGapBanner'); if (gapBanner) gapBanner.style.display = 'none'; const recMedsCard = document.getElementById('recentMedsCard'); if (recMedsCard) recMedsCard.style.display = 'none'; const sepBanner = document.getElementById('sepsisBanner'); if (sepBanner) sepBanner.style.display = 'none'; const denBanner = document.getElementById('dengueBanner'); if (denBanner) denBanner.style.display = 'none';
     const allergy = document.getElementById('allergyBanner'); if (allergy) allergy.hidden = true;
   }
   if (overlay) overlay.hidden = !locked;
@@ -807,6 +808,18 @@ function renderAssistant(d, isChanged = false) {
   }
 
   document.getElementById('patientVn').textContent = visit.vn || currentVn;
+  const vnDtEl = document.getElementById('patientVnDatetime');
+  if (vnDtEl) {
+    if (visit.vstdate) {
+      const dThai = visit.vstdate_thai_short || (typeof thaiDateShort === 'function' ? thaiDateShort(visit.vstdate) : (visit.vstdate_thai || visit.vstdate));
+      const tText = visit.vsttime_short ? `${visit.vsttime_short} น.` : (visit.vsttime ? `${String(visit.vsttime).slice(0, 5)} น.` : '');
+      vnDtEl.textContent = [dThai, tText].filter(Boolean).join(' ');
+      vnDtEl.style.display = 'inline-block';
+    } else {
+      vnDtEl.textContent = '';
+      vnDtEl.style.display = 'none';
+    }
+  }
 
   // แสดง Chief Complaint (CC / อาการสำคัญที่มาตรวจ)
   const ccRow = document.getElementById('patientCcRow');
@@ -857,7 +870,8 @@ function renderAssistant(d, isChanged = false) {
     if (d.erRevisit48h && d.erRevisit48h.hasRevisit) {
       const er = d.erRevisit48h;
       erBanner.style.display = 'block';
-      erHoursBadge.textContent = `${er.hoursAgo} ชม. ที่แล้ว`;
+      const badgeText = er.intervalText ? `กลับมาใน ${er.intervalText}` : `${er.hoursAgo} ชม. ที่แล้ว`;
+      erHoursBadge.textContent = badgeText;
       let infoText = `🗓️ <b>วันที่:</b> ${escapeHtml(er.vstdate_thai || er.vstdate)} (${escapeHtml(er.vsttime)} น.) · <b>แผนก:</b> ${escapeHtml(er.department)}`;
       if (er.cc) infoText += `<br>💬 <b>อาการที่มา ER:</b> ${escapeHtml(er.cc)}`;
       if (er.diag) infoText += `<br>🩺 <b>วินิจฉัย ER:</b> ${escapeHtml(er.diag)}`;
@@ -865,6 +879,62 @@ function renderAssistant(d, isChanged = false) {
       erDetail.innerHTML = infoText;
     } else {
       erBanner.style.display = 'none';
+    }
+  }
+
+  // 4. แสดงการแจ้งเตือน Sepsis / qSOFA
+  const sepsisBanner = document.getElementById('sepsisBanner');
+  const sepsisBadge = document.getElementById('sepsisBadge');
+  const sepsisTitle = document.getElementById('sepsisTitle');
+  const sepsisMessage = document.getElementById('sepsisMessage');
+  const sepsisCriteria = document.getElementById('sepsisCriteria');
+  const sepsisGuidance = document.getElementById('sepsisGuidance');
+  if (sepsisBanner && sepsisBadge && sepsisTitle && sepsisMessage && sepsisCriteria && sepsisGuidance) {
+    if (d.sepsisAlert && d.sepsisAlert.hasAlert) {
+      const sa = d.sepsisAlert;
+      sepsisBanner.style.display = 'block';
+      sepsisBanner.className = 'clinical-alert-banner sepsis-banner ' + sa.severity;
+      sepsisBadge.textContent = 'qSOFA ' + sa.qsofaScore + '/3';
+      sepsisTitle.textContent = sa.title;
+      sepsisMessage.textContent = sa.message;
+      
+      const c = sa.criteria || {};
+      const v = sa.vitals || {};
+      sepsisCriteria.innerHTML = 
+        '<span class="alert-pill ' + (c.rr?.met ? 'met' : 'normal') + '">🫁 RR: <b>' + escapeHtml(c.rr?.val || '-') + '</b> ' + (c.rr?.met ? '⚠️' : '') + '</span>' +
+        '<span class="alert-pill ' + (c.bps?.met ? 'met' : 'normal') + '">🩸 SBP: <b>' + escapeHtml(c.bps?.val || '-') + '</b> ' + (c.bps?.met ? '⚠️' : '') + '</span>' +
+        '<span class="alert-pill ' + (c.ams?.met ? 'met' : 'normal') + '">🧠 สติ: <b>' + escapeHtml(c.ams?.val || '-') + '</b> ' + (c.ams?.met ? '⚠️' : '') + '</span>' +
+        (v.temp && v.temp !== '-' ? '<span class="alert-pill normal">🌡️ T: ' + escapeHtml(v.temp) + '</span>' : '') +
+        (v.pulse && v.pulse !== '-' ? '<span class="alert-pill normal">💓 P: ' + escapeHtml(v.pulse) + '</span>' : '');
+      sepsisGuidance.innerHTML = '💡 <b>ข้อแนะนำทางคลินิก:</b> ' + escapeHtml(sa.guidance);
+    } else {
+      sepsisBanner.style.display = 'none';
+    }
+  }
+
+  // 5. แสดงการแจ้งเตือนเฝ้าระวังไข้เลือดออก (Dengue)
+  const dengueBanner = document.getElementById('dengueBanner');
+  const dengueBadge = document.getElementById('dengueBadge');
+  const dengueTitle = document.getElementById('dengueTitle');
+  const dengueMessage = document.getElementById('dengueMessage');
+  const dengueMetrics = document.getElementById('dengueMetrics');
+  const dengueGuidance = document.getElementById('dengueGuidance');
+  if (dengueBanner && dengueBadge && dengueTitle && dengueMessage && dengueMetrics && dengueGuidance) {
+    if (d.dengueAlert && d.dengueAlert.hasAlert) {
+      const da = d.dengueAlert;
+      dengueBanner.style.display = 'block';
+      dengueBanner.className = 'clinical-alert-banner dengue-banner ' + da.severity;
+      dengueBadge.textContent = da.severity === 'critical' ? 'วิกฤต (Critical)' : 'เฝ้าระวัง (Warning)';
+      dengueTitle.textContent = da.title;
+      dengueMessage.textContent = da.message;
+      
+      dengueMetrics.innerHTML = 
+        '<span class="alert-pill ' + (da.isHemoconcentration ? 'met' : 'normal') + '">🩸 Hct: <b>' + escapeHtml(da.currHct) + '</b> ' + (da.hctRisePct ? '(' + escapeHtml(da.hctRisePct) + ')' : '') + '</span>' +
+        '<span class="alert-pill ' + (da.severity === 'critical' ? 'met' : 'normal') + '">🩹 เกล็ดเลือด: <b>' + escapeHtml(da.currPlt) + '</b></span>' +
+        (da.baselineHct && da.baselineHct !== 'ไม่พบประวัติเดิม' ? '<span class="alert-pill normal">📊 Baseline Hct: ' + escapeHtml(da.baselineHct) + '</span>' : '');
+      dengueGuidance.innerHTML = '💡 <b>ข้อแนะนำทางคลินิก:</b> ' + escapeHtml(da.guidance);
+    } else {
+      dengueBanner.style.display = 'none';
     }
   }
 
@@ -948,8 +1018,8 @@ function renderAssistant(d, isChanged = false) {
   currentCrcl = renalData.crcl;
   currentScr = renalData.cr;
 
-  // ผลแล็บผิดปกติ
-  const labAlertCount = renderLabAlerts(labs);
+  // ผลแล็บผิดปกติ (ส่งกลุ่มใบสั่งตรวจ d.labResults เพื่อจัดกลุ่มย่อ/ขยาย)
+  const labAlertCount = renderLabAlerts(d.labResults || [], labs);
 
   // คำเตือนยา & เสนอยาสมุนไพร
   const herbAlertData = renderDrugAndHerbs(patient, screening, labs, diag, meds, visit);
@@ -1189,9 +1259,9 @@ function evaluateLabResult(l) {
       if (val < 3.5) { isAbnormal = true; direction = 'low'; if (val < 2.8) isCritical = true; }
       else if (val > 5.1) { isAbnormal = true; direction = 'high'; if (val > 6.0) isCritical = true; }
     } else if (/gap with k|anion gap/i.test(name)) {
-      // Anion Gap with K+ (เกณฑ์ปกติสากล 10 - 20 mEq/L, วิกฤตหาก >= 30)
-      if (val < 8) { isAbnormal = true; direction = 'low'; }
-      else if (val > 20) { isAbnormal = true; direction = 'high'; if (val >= 30) isCritical = true; }
+      // Anion Gap with K+ เป็นดัชนีคำนวณ ไม่ใช่ Potassium (K)
+      // ไม่เตือนค่าต่ำเพราะไม่ใช่ K และไม่มีนัยสำคัญทางคลินิก เตือนเฉพาะ High Anion Gap Metabolic Acidosis (>= 28)
+      if (val >= 28) { isAbnormal = true; direction = 'high'; isCritical = true; }
     } else if (!/gap/i.test(name) && (/sodium/i.test(name) || /^\s*na(\+)?\s*$/i.test(name) || /^\s*na\s*\(/i.test(name))) {
       if (val < 135) { isAbnormal = true; direction = 'low'; if (val < 125) isCritical = true; }
       else if (val > 145) { isAbnormal = true; direction = 'high'; if (val > 155) isCritical = true; }
@@ -1249,53 +1319,163 @@ function evaluateLabResult(l) {
   };
 }
 
-// ─── 4.2 แจ้งเตือนผลแล็บผิดปกติ (ครอบคลุมทุกรายการใน HOSxP) ───
-function renderLabAlerts(labs) {
+// ─── 4.2 แจ้งเตือนผลแล็บผิดปกติแบบย่อ/ขยายตามใบสั่งตรวจ (Collapsible Accordion by Form) ───
+function renderSingleLabItem(l) {
+  let flagHtml = '';
+  if (l.eval.isCritical) {
+    flagHtml = '<span class="lab-flag critical">🚨 CRITICAL</span>';
+  } else if (l.eval.direction === 'high') {
+    flagHtml = '<span class="lab-flag high">🔺 HIGH</span>';
+  } else if (l.eval.direction === 'low') {
+    flagHtml = '<span class="lab-flag low">🔻 LOW</span>';
+  } else {
+    flagHtml = '<span class="lab-flag abnormal">⚠️ ผิดปกติ</span>';
+  }
+
+  const normHtml = l.eval.normalValue ? ('<span class="lab-normal-ref">(ปกติ: ' + escapeHtml(l.eval.normalValue) + ')</span>') : '';
+
+  return (
+    '<div class="lab-item abnormal clickable-lab" onclick="openLabHistory(\'' + escapeHtml(l.item_name || '') + '\')" title="คลิกดูแนวโน้มผลแล็บ ' + escapeHtml(l.item_name || '') + ' ย้อนหลัง 10 ครั้ง">' +
+      '<span class="lab-name">' + escapeHtml(l.item_name || 'Lab') + normHtml + '</span>' +
+      '<div class="lab-vals">' +
+        '<span class="lab-val">' + escapeHtml(l.result) + ' ' + escapeHtml(l.unit || '') + '</span>' +
+        flagHtml +
+        '<span class="btn-lab-item-chart" title="ดูกราฟเปรียบเทียบย้อนหลัง">📈 10 ครั้ง</span>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+window.toggleLabOrder = function(idx) {
+  const card = document.getElementById('labOrderCard_' + idx);
+  if (!card) return;
+  const body = card.querySelector('.lab-order-body');
+  const chevron = card.querySelector('.lab-order-chevron');
+  const isOpen = card.classList.contains('open');
+  if (isOpen) {
+    card.classList.remove('open');
+    if (body) body.style.display = 'none';
+    if (chevron) chevron.textContent = '▶';
+  } else {
+    card.classList.add('open');
+    if (body) body.style.display = 'block';
+    if (chevron) chevron.textContent = '▼';
+  }
+};
+
+window.toggleAllLabOrders = function() {
+  const cards = document.querySelectorAll('.lab-order-card');
+  if (cards.length === 0) return;
+  const anyClosed = Array.from(cards).some(c => !c.classList.contains('open'));
+  cards.forEach((c, idx) => {
+    const body = c.querySelector('.lab-order-body');
+    const chevron = c.querySelector('.lab-order-chevron');
+    if (anyClosed) {
+      c.classList.add('open');
+      if (body) body.style.display = 'block';
+      if (chevron) chevron.textContent = '▼';
+    } else {
+      if (idx === 0) {
+        c.classList.add('open');
+        if (body) body.style.display = 'block';
+        if (chevron) chevron.textContent = '▼';
+      } else {
+        c.classList.remove('open');
+        if (body) body.style.display = 'none';
+        if (chevron) chevron.textContent = '▶';
+      }
+    }
+  });
+};
+
+function renderLabAlerts(labGroups, flatLabs) {
   const container = document.getElementById('labAlertList');
   const badge = document.getElementById('labCountBadge');
+  const btnToggleAll = document.getElementById('btnToggleAllLabs');
 
-  const evaluated = labs.map(l => ({ ...l, eval: evaluateLabResult(l) }));
-  const abnormalLabs = evaluated.filter(l => l.eval.isAbnormal);
+  const groups = Array.isArray(labGroups) && labGroups.length > 0 ? labGroups : [{
+    form_name: 'ผลตรวจทางห้องปฏิบัติการ',
+    items: flatLabs || []
+  }];
 
-  badge.textContent = abnormalLabs.length;
+  const orderCards = [];
+  let totalAbnormalCount = 0;
 
-  if (abnormalLabs.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state" style="padding: 10px 12px; text-align: center;">
-        <div>ไม่มีผลแล็บวิกฤต/ผิดปกติใน Visit นี้</div>
-        <button type="button" class="btn-open-lab-trend-empty" onclick="openGeneralLabHistory()" title="คลิกเพื่อดูกราฟประวัติผลแล็บ">📈 ดูกราฟประวัติผลแล็บ</button>
-      </div>
-    `;
+  groups.forEach((group, groupIdx) => {
+    const formName = group.form_name || 'ใบสั่งตรวจแล็บ';
+    const dateText = group.order_date_thai || group.order_date || '';
+    const timeText = group.order_time ? (group.order_time + ' น.') : '';
+    const items = (group.items || []).map(it => ({
+      item_code: it.code || it.lab_items_code,
+      item_name: it.name || it.item_name || '',
+      result: it.result || '',
+      unit: it.unit || '',
+      abnormal: !!(it.abnormal || it.abnormal_result === 'Y'),
+      critical: !!(it.critical || it.critical_result === 'Y'),
+      normal_value: it.normal_value || it.lab_items_normal_value || it.lab_items_normal_value_ref || '',
+      range_min: it.range_min,
+      range_max: it.range_max,
+      form_name: formName
+    })).map(l => ({ ...l, eval: evaluateLabResult(l) }));
+
+    const abnormalItems = items.filter(l => l.eval.isAbnormal);
+    if (abnormalItems.length > 0) {
+      totalAbnormalCount += abnormalItems.length;
+      const critCount = abnormalItems.filter(l => l.eval.isCritical).length;
+      orderCards.push({
+        idx: orderCards.length,
+        orderNumber: group.lab_order_number || groupIdx,
+        formName: formName,
+        dateText: dateText,
+        timeText: timeText,
+        critCount: critCount,
+        abnormalItems: abnormalItems,
+        isExpanded: (orderCards.length === 0 || critCount > 0)
+      });
+    }
+  });
+
+  if (badge) badge.textContent = totalAbnormalCount;
+
+  if (totalAbnormalCount === 0 || orderCards.length === 0) {
+    if (btnToggleAll) btnToggleAll.style.display = 'none';
+    container.innerHTML = 
+      '<div class="empty-state" style="padding: 10px 12px; text-align: center;">' +
+        '<div>ไม่มีผลแล็บวิกฤต/ผิดปกติใน Visit นี้</div>' +
+        '<button type="button" class="btn-open-lab-trend-empty" onclick="openGeneralLabHistory()" title="คลิกเพื่อดูกราฟประวัติผลแล็บ">📈 ดูกราฟประวัติผลแล็บ</button>' +
+      '</div>';
     return 0;
   }
 
-  container.innerHTML = abnormalLabs.map(l => {
-    let flagHtml = '';
-    if (l.eval.isCritical) {
-      flagHtml = '<span class="lab-flag critical">🚨 CRITICAL</span>';
-    } else if (l.eval.direction === 'high') {
-      flagHtml = '<span class="lab-flag high">🔺 HIGH</span>';
-    } else if (l.eval.direction === 'low') {
-      flagHtml = '<span class="lab-flag low">🔻 LOW</span>';
-    } else {
-      flagHtml = '<span class="lab-flag abnormal">⚠️ ผิดปกติ</span>';
-    }
+  if (btnToggleAll) {
+    btnToggleAll.style.display = orderCards.length > 1 ? 'inline-block' : 'none';
+  }
 
-    const normHtml = l.eval.normalValue ? `<span class="lab-normal-ref">(ปกติ: ${escapeHtml(l.eval.normalValue)})</span>` : '';
-
-    return `
-      <div class="lab-item abnormal clickable-lab" onclick="openLabHistory('${escapeHtml(l.item_name || '')}')" title="คลิกดูแนวโน้มผลแล็บ ${escapeHtml(l.item_name || '')} ย้อนหลัง 10 ครั้ง">
-        <span class="lab-name">${escapeHtml(l.item_name || 'Lab')}${normHtml}</span>
-        <div class="lab-vals">
-          <span class="lab-val">${escapeHtml(l.result)} ${escapeHtml(l.unit || '')}</span>
-          ${flagHtml}
-          <span class="btn-lab-item-chart" title="ดูกราฟเปรียบเทียบย้อนหลัง">📈 10 ครั้ง</span>
-        </div>
-      </div>
-    `;
+  container.innerHTML = orderCards.map(card => {
+    return (
+      '<div class="lab-order-card ' + (card.isExpanded ? 'open' : '') + '" id="labOrderCard_' + card.idx + '">' +
+        '<div class="lab-order-header" onclick="toggleLabOrder(' + card.idx + ')" title="คลิกเพื่อย่อ/ขยายใบสั่งตรวจนี้">' +
+          '<div class="lab-order-header-left">' +
+            '<span class="lab-order-chevron">' + (card.isExpanded ? '▼' : '▶') + '</span>' +
+            '<span class="lab-order-icon">📋</span>' +
+            '<span class="lab-order-name">' + escapeHtml(card.formName) + '</span>' +
+            (card.dateText ? ('<span class="lab-order-time">' + escapeHtml(card.dateText) + (card.timeText ? (' (' + escapeHtml(card.timeText) + ')') : '') + '</span>') : '') +
+          '</div>' +
+          '<div class="lab-order-header-right">' +
+            (card.critCount > 0 ? ('<span class="lab-pill-crit">🚨 วิกฤต ' + card.critCount + '</span>') : '') +
+            '<span class="lab-pill-count">' + card.abnormalItems.length + ' รายการ</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="lab-order-body" style="display: ' + (card.isExpanded ? 'block' : 'none') + ';">' +
+          '<div class="lab-items-list">' +
+            card.abnormalItems.map(renderSingleLabItem).join('') +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
   }).join('');
 
-  return abnormalLabs.length;
+  return totalAbnormalCount;
 }
 
 // ─── 4.3 คำเตือนยา & เสนอยาสมุนไพรทางเลือก (โมเดล รพ.บ้านด่านลานหอย) ───
@@ -1505,8 +1685,13 @@ function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit) {
     suggestedPe = 'HEENT: mild pharyngeal injection, tonsils not enlarged, no tonsillar exudate, no cervical lymphadenopathy\nChest: clear, normal breath sounds, no rhonchi, no wheezing\nHeart: normal S1S2, regular rate and rhythm, no murmur\nAbdomen: soft, not tender, normal bowel sounds';
   }
 
-  // 2. ปวดกล้ามเนื้อ / ปวดหลัง / ข้อเข่าเสื่อม (Low Back Pain / Myalgia / Osteoarthritis)
-  if (/pain|myalgia|ปวดหลัง|ปวดเมื่อย|กล้ามเนื้อ|เข่าเสื่อม|osteoarthr|m17|m54|m79/i.test(allClinical)) {
+  // 2. ระบบกระดูกและกล้ามเนื้อ (Musculoskeletal / Pain / LBP / Cervicalgia / Knee OA)
+  const isNeckOrHead = /ปวดท้ายทอย|ท้ายทอย|ปวดคอ|ต้นคอ|cervical|neck|m54\.?2|บ่า|สะบัก|trapezius|tension\s*headache|g44\.?2/i.test(allClinical);
+  const isLowBack = /ปวดหลัง|ปวดเอว|low\s*back|lbp|lumbar|lumbago|sciatica|m54\.?5|m54\.?4|m51/i.test(allClinical);
+  const isKnee = /เข่า|knee|osteoarthr|oa\s*knee|m17/i.test(allClinical);
+  const isGeneralPain = /pain|myalgia|ปวดเมื่อย|กล้ามเนื้อ|m54|m79/i.test(allClinical);
+
+  if (isNeckOrHead || isLowBack || isKnee || isGeneralPain) {
     const painHerbs = [
       {
         key: 'thao_wan_priang',
@@ -1520,27 +1705,45 @@ function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit) {
       }
     ].filter(h => isHerbSafe(h.key));
 
+    let groupTitle = 'ปวดกล้ามเนื้อ / ข้ออักเสบ';
+    let diagTag = 'myalgia';
+    if (isLowBack) {
+      groupTitle = 'ปวดหลัง / กล้ามเนื้อหลังส่วนเอว';
+      diagTag = 'myalgia / LBP';
+    } else if (isNeckOrHead) {
+      groupTitle = 'ปวดคอ / ท้ายทอย / กล้ามเนื้อบ่า';
+      diagTag = 'cervical / myalgia';
+    } else if (isKnee) {
+      groupTitle = 'ปวดเข่า / ข้อเข่าเสื่อม';
+      diagTag = 'OA Knee';
+    }
+
     if (painHerbs.length > 0) {
       herbGroups.push({
-        groupTitle: 'ปวดหลัง / กล้ามเนื้ออักเสบ',
-        diagTag: 'myalgia / LBP',
+        groupTitle,
+        diagTag,
         herbs: painHerbs
       });
     }
 
-    const physHerbs = [
-      {
+    const physHerbs = [];
+    if (isHerbSafe('plai_cream')) {
+      physHerbs.push({
         key: 'plai_cream',
         name: '🌿 ครีมไพล / น้ำมันไพล (GPO)',
         sub: 'ทาและถูนวดเบาๆ วันละ 2-3 ครั้ง'
-      },
-      {
+      });
+    }
+
+    // 🦺 เสื้อพยุงหลัง (LS Support): แนะนำเฉพาะกรณีปวดหลัง / ปวดเอว / LBP เท่านั้น! ไม่แนะนำในเคสปวดคอ ท้ายทอย หรือปวดเข่า
+    if (isLowBack && isHerbSafe('ls_support')) {
+      physHerbs.push({
         key: 'ls_support',
         name: '🦺 เสื้อพยุงหลัง (LS Support)',
         sub: 'สปสช. เคลม 1,000 บาท (ต้นทุน 200 กว่าบาท)',
         isInstrument: true
-      }
-    ].filter(h => isHerbSafe(h.key));
+      });
+    }
 
     if (physHerbs.length > 0) {
       herbGroups.push({
@@ -1550,8 +1753,17 @@ function renderDrugAndHerbs(patient, screening, labs, diag, meds, visit) {
       });
     }
 
+    // เลือกข้อความตรวจร่างกาย (PE) ให้ตรงกับตำแหน่งทางกายวิภาคที่คนไข้มาตรวจจริง
     if (!suggestedPe) {
-      suggestedPe = 'Back: mild lumbar paraspinal tenderness, no midline spinous process tenderness, no step-off deformity\nSLRT: negative bilaterally (both legs)\nExtremities: motor power grade V all, normal sensation and deep tendon reflexes (DTR 2+ equal)';
+      if (isNeckOrHead) {
+        suggestedPe = 'Neck: mild tenderness at trapezius and suboccipital muscles, no limitation of range of motion, no cervical spine tenderness\nNeurological: motor power grade V both upper extremities, sensation intact, no radiculopathy (Spurling\'s test negative)';
+      } else if (isLowBack) {
+        suggestedPe = 'Back: mild lumbar paraspinal tenderness, no midline spinous process tenderness, no step-off deformity\nSLRT: negative bilaterally (both legs)\nExtremities: motor power grade V all, normal sensation and deep tendon reflexes (DTR 2+ equal)';
+      } else if (isKnee) {
+        suggestedPe = 'Knee: mild crepitus on active motion, no joint effusion, no local heat, range of motion within normal limits, McMurray test negative';
+      } else {
+        suggestedPe = 'Musculoskeletal: generalized muscle tenderness, normal range of motion all extremities, no localized swelling or inflammation, motor power grade V all';
+      }
     }
   }
 
@@ -2246,7 +2458,8 @@ window.loadMoreHistory = function() {
 
 window.openLabHistory = function(labName) {
   if (!labName) return;
-  openHistoryModal('lab_' + labName, `ประวัติผลตรวจแล็บ: ${labName}`, 'ติดตามแนวโน้มผลตรวจทางห้องปฏิบัติการย้อนหลัง');
+  const displayTitle = (/^hematocrit\d*$|^hct\d*$/i.test(labName)) ? 'Hct (Hematocrit)' : labName;
+  openHistoryModal('lab_' + labName, `ประวัติผลตรวจแล็บ: ${displayTitle}`, 'ติดตามแนวโน้มผลตรวจทางห้องปฏิบัติการย้อนหลัง');
 };
 
 async function fetchAndRenderHistory(type, limit) {
@@ -2275,10 +2488,15 @@ async function fetchAndRenderHistory(type, limit) {
   if (labChipsBar) {
     labChipsBar.style.display = (type.startsWith('lab_')) ? 'flex' : 'none';
     if (type.startsWith('lab_')) {
-      const activeLabKey = type.replace('lab_', '').toLowerCase();
+      const rawLabKey = type.replace('lab_', '').toLowerCase();
+      const activeLabKey = (/^hematocrit\d*$|^hct\d*$/i.test(rawLabKey)) ? 'hct' :
+                           (/^platelet|^plt/i.test(rawLabKey)) ? 'platelet' :
+                           (/^potassium|^k$/i.test(rawLabKey)) ? 'potassium' :
+                           (/^sodium|^na$/i.test(rawLabKey)) ? 'sodium' :
+                           rawLabKey;
       labChipsBar.querySelectorAll('.btn-toggle-pill').forEach(btn => {
         const key = (btn.dataset.lab || '').toLowerCase();
-        btn.classList.toggle('active', activeLabKey.includes(key) || key.includes(activeLabKey));
+        btn.classList.toggle('active', activeLabKey === key || key.includes(activeLabKey) || activeLabKey.includes(key));
       });
     }
   }
@@ -2777,7 +2995,8 @@ async function fetchAndRenderHistory(type, limit) {
       }
 
     } else if (type.startsWith('lab_')) {
-      const labName = type.replace('lab_', '');
+      const rawLabName = type.replace('lab_', '');
+      const queryLab = (/^hematocrit\d*$|^hct\d*$/i.test(rawLabName)) ? 'hct' : rawLabName;
       thead.innerHTML = `
         <tr>
           <th style="width: 24%;">วันที่</th>
@@ -2788,13 +3007,14 @@ async function fetchAndRenderHistory(type, limit) {
         </tr>
       `;
 
-      const res = await fetch(`/api/assistant/patient-lab-history/${encodeURIComponent(currentHn)}?type=${encodeURIComponent(labName)}&limit=${limit}`);
+      const res = await fetch(`/api/assistant/patient-lab-history/${encodeURIComponent(currentHn)}?type=${encodeURIComponent(queryLab)}&limit=${limit}`);
       const json = await res.json();
       const list = json.data || [];
 
       const wrapLoadMore = document.getElementById('wrapTableLoadMore');
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">ไม่พบประวัติผลตรวจแล็บ ${escapeHtml(labName)}</td></tr>`;
+        const displayLabName = (/^hematocrit\d*$|^hct\d*$/i.test(rawLabName)) ? 'Hct / Hematocrit' : rawLabName;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">ไม่พบประวัติผลตรวจแล็บ ${escapeHtml(displayLabName)}</td></tr>`;
         if (wrapLoadMore) wrapLoadMore.style.display = 'none';
         if (btnLoadMore) btnLoadMore.style.display = 'none';
         if (chartCard) chartCard.style.display = 'none';
@@ -3470,8 +3690,10 @@ function renderHistoryTrendChart(type, data) {
     }
 
   } else if (type.startsWith('lab_')) {
-    const targetKey = type.replace('lab_', '').trim().toLowerCase();
-    title = `แนวโน้มผลตรวจทางห้องปฏิบัติการ: ${type.replace('lab_', '').trim().toUpperCase()}`;
+    const rawTarget = type.replace('lab_', '').trim();
+    const targetKey = rawTarget.toLowerCase();
+    const displayTargetName = (/^hematocrit\d*$|^hct\d*$/i.test(targetKey)) ? 'HCT (HEMATOCRIT)' : rawTarget.toUpperCase();
+    title = `แนวโน้มผลตรวจทางห้องปฏิบัติการ: ${displayTargetName}`;
     const chrono = [...data].reverse();
 
     // จัดกลุ่มตามชื่อรายการแล็บจริง (lab_items_name) เพื่อไม่นำค่าคนละตัวมาต่อเส้นเดียวกัน
@@ -3487,11 +3709,26 @@ function renderHistoryTrendChart(type, data) {
 
       // กรองเฉพาะรายการที่สัมพันธ์กับที่เลือก (เช่น ถ้าเลือก wbc ไม่ดึง platelet หรือ urine มาปน)
       if (targetKey !== 'cbc') {
-        if (!itemLower.includes(targetKey) && !targetKey.includes(itemLower)) return;
+        const isHctMatch = (/^hematocrit\d*$|^hct\d*$/i.test(itemLower) && /^hematocrit\d*$|^hct\d*$/i.test(targetKey));
+        const isKMatch = ((/potassium|^k$/i.test(itemLower) && /potassium|^k$/i.test(targetKey)) && !itemLower.includes('gap'));
+        const isNaMatch = (/sodium|^na$/i.test(itemLower) && /sodium|^na$/i.test(targetKey));
+        const isPltMatch = (/platelet|plt/i.test(itemLower) && /platelet|plt/i.test(targetKey));
+        const isAstMatch = (/ast|sgot/i.test(itemLower) && /ast|sgot/i.test(targetKey));
+        const isAltMatch = (/alt|sgpt/i.test(itemLower) && /alt|sgpt/i.test(targetKey));
+        const isCrMatch = (/creatinine|^cr\b/i.test(itemLower) && /creatinine|^cr\b/i.test(targetKey));
+
+        const matchesTarget = isHctMatch || isKMatch || isNaMatch || isPltMatch || isAstMatch || isAltMatch || isCrMatch ||
+          itemLower.includes(targetKey) || targetKey.includes(itemLower);
+
+        if (!matchesTarget) return;
         if (targetKey === 'wbc' && (itemLower.includes('ua') || itemLower.includes('urine'))) return;
+        if (targetKey === 'k' && itemLower.includes('gap')) return;
       }
 
-      if (!itemMap.has(itemName)) {
+      // สำหรับ Hct ให้จัดกลุ่มรวมทั้ง Hematocrit และ Hematocrit2 เพื่อพล็อตเป็นเส้นแนวโน้มเดียวกัน
+      const groupKey = (/^hematocrit\d*$|^hct\d*$/i.test(itemName)) ? 'Hematocrit' : itemName;
+
+      if (!itemMap.has(groupKey)) {
         let nMin = null, nMax = null;
         if (r.lab_items_normal_value) {
           const m = String(r.lab_items_normal_value).match(/([0-9.]+)\s*[-–—]\s*([0-9.]+)/);
@@ -3500,9 +3737,9 @@ function renderHistoryTrendChart(type, data) {
             nMax = parseFloat(m[2]);
           }
         }
-        itemMap.set(itemName, {
-          name: itemName,
-          unit: r.lab_items_unit || '',
+        itemMap.set(groupKey, {
+          name: groupKey,
+          unit: r.lab_items_unit || (groupKey === 'Hematocrit' ? '%' : ''),
           normMin: nMin,
           normMax: nMax,
           pts: []
@@ -3510,12 +3747,12 @@ function renderHistoryTrendChart(type, data) {
       }
 
       const dt = formatShortChartDate(r.order_date_thai || r.order_date);
-      itemMap.get(itemName).pts.push({
+      itemMap.get(groupKey).pts.push({
         date: dt,
         val: val,
-        displayVal: Number.isInteger(val) ? val : (val >= 100 ? Math.round(val) : val.toFixed(2)),
-        unit: r.lab_items_unit || '',
-        tip: `${dt}: ${itemName} = ${val} ${r.lab_items_unit || ''}`
+        displayVal: Number.isInteger(val) ? val : (val >= 100 ? Math.round(val) : val.toFixed(1)),
+        unit: r.lab_items_unit || (groupKey === 'Hematocrit' ? '%' : ''),
+        tip: `${dt}: ${itemName} = ${val} ${r.lab_items_unit || (groupKey === 'Hematocrit' ? '%' : '')}`
       });
     });
 

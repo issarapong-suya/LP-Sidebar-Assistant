@@ -243,6 +243,13 @@ body {
   font-size: 12px;
 }
 
+.vn-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .vn-label {
   color: #64748b;
   font-weight: 600;
@@ -253,6 +260,18 @@ body {
   font-weight: 700;
   color: #1e293b;
   letter-spacing: 0.4px;
+}
+
+.vn-datetime-pill {
+  font-size: 11px;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 
 .btn-refresh {
@@ -2754,4 +2773,269 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
 .btn-load-more-visits:hover {
   background: #0f766e;
   color: #ffffff;
+}
+
+/* ─── Disease-Specific Clinical Alert Banners (Sepsis & Dengue) ─── */
+.clinical-alert-banner {
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 8px 12px 10px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  animation: slideDown 0.25s ease-out;
+  transition: all 0.2s ease;
+}
+.alert-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alert-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.alert-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+}
+.alert-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.alert-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.alert-body {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.alert-message {
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.alert-criteria-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.alert-pill.met {
+  background: #fee2e2;
+  border: 1px solid #f87171;
+  color: #991b1b;
+}
+.alert-pill.normal {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+}
+.alert-guidance-box {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-left: 4px solid #0f766e;
+  color: #0f172a;
+}
+
+/* Sepsis Theme */
+.sepsis-banner.critical {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
+  border: 1.5px solid #f87171;
+  border-left: 5px solid #dc2626;
+  animation: erPulse 2s infinite ease-in-out;
+}
+.sepsis-banner.critical .alert-title {
+  color: #991b1b;
+}
+.sepsis-banner.critical .alert-badge {
+  background: #dc2626;
+  color: #ffffff;
+}
+.sepsis-banner.critical .alert-guidance-box {
+  border-left-color: #dc2626;
+  background: #ffffff;
+}
+
+.sepsis-banner.warning {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1.5px solid #fcd34d;
+  border-left: 5px solid #d97706;
+}
+.sepsis-banner.warning .alert-title {
+  color: #92400e;
+}
+.sepsis-banner.warning .alert-badge {
+  background: #d97706;
+  color: #ffffff;
+}
+.sepsis-banner.warning .alert-guidance-box {
+  border-left-color: #d97706;
+  background: #ffffff;
+}
+
+/* Dengue Theme */
+.dengue-banner.critical {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1.5px solid #fb7185;
+  border-left: 5px solid #e11d48;
+  animation: erPulse 2.5s infinite ease-in-out;
+}
+.dengue-banner.critical .alert-title {
+  color: #9f1239;
+}
+.dengue-banner.critical .alert-badge {
+  background: #e11d48;
+  color: #ffffff;
+}
+.dengue-banner.critical .alert-guidance-box {
+  border-left-color: #e11d48;
+  background: #ffffff;
+}
+
+.dengue-banner.warning {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1.5px solid #fdba74;
+  border-left: 5px solid #ea580c;
+}
+.dengue-banner.warning .alert-title {
+  color: #9a3412;
+}
+.dengue-banner.warning .alert-badge {
+  background: #ea580c;
+  color: #ffffff;
+}
+.dengue-banner.warning .alert-guidance-box {
+  border-left-color: #ea580c;
+  background: #ffffff;
+}
+
+/* ─── Collapsible Lab Order Cards (Accordion by Form/Date) ─── */
+.lab-order-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+.lab-order-card:hover {
+  border-color: #cbd5e1;
+}
+.lab-order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid transparent;
+}
+.lab-order-card.open .lab-order-header {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+.lab-order-header:hover {
+  background: #e2e8f0;
+}
+.lab-order-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.lab-order-chevron {
+  font-size: 10px;
+  color: #64748b;
+  width: 14px;
+  text-align: center;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.lab-order-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.lab-order-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-order-time {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lab-order-header-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.lab-pill-crit {
+  background: #fee2e2;
+  border: 1px solid #f87171;
+  color: #991b1b;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  animation: erPulse 2s infinite ease-in-out;
+}
+.lab-pill-count {
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  color: #0369a1;
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.lab-order-body {
+  padding: 4px 6px;
+  background: #ffffff;
+}
+.btn-toggle-all-labs {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn-toggle-all-labs:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
 }

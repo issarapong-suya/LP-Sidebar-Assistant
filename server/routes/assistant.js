@@ -41,6 +41,14 @@ function thaiDate(value) {
   return `${date.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][date.getMonth()]} ${date.getFullYear() + 543}`;
 }
 
+function thaiDateShort(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  const yy = String(date.getFullYear() + 543).slice(-2);
+  return `${date.getDate()} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][date.getMonth()]} ${yy}`;
+}
+
 function thaiDateFull(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -189,7 +197,7 @@ router.get('/visit-data/:vn', async (req, res) => {
   try {
     const db = getPool();
     const [visits] = await db.execute(`
-      SELECT o.vn,o.hn,DATE_FORMAT(o.vstdate,'%Y-%m-%d') AS vstdate,o.vsttime,o.oqueue,o.spclty,o.diag_text,
+      SELECT o.vn,o.hn,o.an,DATE_FORMAT(o.vstdate,'%Y-%m-%d') AS vstdate,o.vsttime,o.oqueue,o.spclty,o.diag_text,
         o.doctor AS doctor_code,IFNULL(d.name,'') AS doctor_name,o.main_dep,o.cur_dep,
         IFNULL(k.department,'ห้องตรวจแพทย์') AS main_dep_name,IFNULL(pt.name,'') AS pttype_name
       FROM ovst o LEFT JOIN doctor d ON o.doctor=d.code
@@ -202,7 +210,7 @@ router.get('/visit-data/:vn', async (req, res) => {
         TIMESTAMPDIFF(YEAR,birthday,CURDATE()) AS age,DATE_FORMAT(birthday,'%Y-%m-%d') AS birthday,drugallergy
         FROM patient WHERE hn=? LIMIT 1`, [visit.hn]),
       db.execute('SELECT age_y,age_m FROM vn_stat WHERE vn=? LIMIT 1', [vn]),
-      db.execute(`SELECT cc,hpi,pmh,fh,sh,pe,bps,bpd,pulse,rr,temperature,bw,height,bmi,waist,spo2,fbs,pefr,pain_score,found_allergy
+      db.execute(`SELECT cc,hpi,pmh,fh,sh,pe,bps,bpd,pulse,rr,temperature,bw,height,bmi,waist,spo2,fbs,pefr,pain_score,found_allergy,consciousness_level_type_id,pe_ga_text,pe_neuro_text
         FROM opdscreen WHERE vn=? LIMIT 1`, [vn]),
       db.execute(`SELECT od.icd10,od.diagtype,od.dx_code_note,IFNULL(i.name,'') AS name FROM ovstdiag od
         LEFT JOIN icd101 i ON od.icd10=i.code WHERE od.vn=? ORDER BY od.diagtype`, [vn]),
@@ -210,8 +218,11 @@ router.get('/visit-data/:vn', async (req, res) => {
         CONCAT(IFNULL(u.name1,''),' ',IFNULL(u.name2,''),' ',IFNULL(u.name3,'')) AS drug_usage
         FROM opitemrece o LEFT JOIN drugitems d ON o.icode=d.icode
         LEFT JOIN drugusage u ON o.drugusage=u.drugusage WHERE o.vn=? ORDER BY o.item_no`, [vn]),
-      db.execute(`SELECT lab_order_number,form_name,reporter_name FROM lab_head
-        WHERE vn=? AND confirm_report='Y' ORDER BY lab_order_number`, [vn])
+      db.execute(`SELECT lab_order_number,form_name,reporter_name,
+        DATE_FORMAT(order_date,'%Y-%m-%d') AS order_date,order_time
+        FROM lab_head
+        WHERE (vn=? OR (vn=? AND ? != '')) AND confirm_report='Y'
+        ORDER BY order_date DESC, order_time DESC, lab_order_number DESC`, [vn, visits[0]?.an || '', visits[0]?.an || ''])
     ]);
     const patient = patients[0] || {};
     const screening = screens[0] || {};
@@ -280,7 +291,14 @@ router.get('/visit-data/:vn', async (req, res) => {
         li.lab_items_unit AS unit,li.lab_items_normal_value AS normal_value
         FROM lab_order lo LEFT JOIN lab_items li ON lo.lab_items_code=li.lab_items_code
         WHERE lo.lab_order_number=? AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result!=''`, [head.lab_order_number]);
-      if (items.length) labResults.push({ form_name: head.form_name || 'ผลตรวจทางห้องปฏิบัติการ', reporter_name: head.reporter_name || '', items: items.map(item => ({
+      if (items.length) labResults.push({
+        lab_order_number: head.lab_order_number,
+        form_name: head.form_name || 'ผลตรวจทางห้องปฏิบัติการ',
+        order_date: head.order_date,
+        order_date_thai: thaiDate(head.order_date),
+        order_time: head.order_time ? String(head.order_time).slice(0, 5) : '',
+        reporter_name: head.reporter_name || '',
+        items: items.map(item => ({
         ...item, abnormal: item.abnormal_result === 'Y', critical: item.critical_result === 'Y', normal_value: item.lab_items_normal_value_ref || item.normal_value || ''
       })) });
     }
@@ -294,13 +312,15 @@ router.get('/visit-data/:vn', async (req, res) => {
 
     let erRevisit48h = null;
     try {
+      const curVisitDateTime = `${visit.vstdate} ${visit.vsttime || '00:00:00'}`;
       const [erRows] = await db.execute(`
         SELECT o.vn, o.hn, DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate, o.vsttime,
                IFNULL(k.department, 'อุบัติเหตุ ฉุกเฉินER') AS department_name,
                IFNULL(o.diag_text, '') AS diag_text,
                IFNULL(s.cc, '') AS cc,
                IFNULL(d.name, '') AS doctor_name,
-               TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), NOW()) AS hours_ago
+               TIMESTAMPDIFF(MINUTE, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), ?) AS minutes_diff,
+               TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), ?) AS hours_diff
         FROM ovst o
         LEFT JOIN kskdepartment k ON o.main_dep = k.depcode
         LEFT JOIN opdscreen s ON o.vn = s.vn
@@ -308,19 +328,28 @@ router.get('/visit-data/:vn', async (req, res) => {
         WHERE o.hn = ?
           AND o.vn != ?
           AND (k.department LIKE '%ฉุกเฉิน%' OR k.department LIKE '%ER%' OR o.main_dep = '003' OR o.cur_dep = '003')
-          AND TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), NOW()) BETWEEN 0 AND 48
+          AND CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')) <= ?
+          AND TIMESTAMPDIFF(HOUR, CONCAT(o.vstdate, ' ', IFNULL(o.vsttime, '00:00:00')), ?) BETWEEN 0 AND 48
         ORDER BY o.vstdate DESC, o.vsttime DESC
         LIMIT 1
-      `, [visit.hn, vn]);
+      `, [curVisitDateTime, curVisitDateTime, visit.hn, vn, curVisitDateTime, curVisitDateTime]);
       if (erRows[0]) {
         const er = erRows[0];
+        const minutesDiff = Math.max(0, Number(er.minutes_diff) || 0);
+        const hours = Math.floor(minutesDiff / 60);
+        const mins = minutesDiff % 60;
+        const intervalText = hours > 0
+          ? (mins > 0 ? `${hours} ชม. ${mins} นาที` : `${hours} ชม.`)
+          : `${mins} นาที`;
         erRevisit48h = {
           hasRevisit: true,
           vn: String(er.vn),
           vstdate: er.vstdate,
           vstdate_thai: thaiDate(er.vstdate),
           vsttime: er.vsttime ? String(er.vsttime).slice(0, 5) : '',
-          hoursAgo: Math.max(0, Number(er.hours_ago) || 0),
+          hoursAgo: Math.max(0, Number(er.hours_diff) || 0),
+          minutesAgo: minutesDiff,
+          intervalText,
           department: String(er.department_name || 'ห้องฉุกเฉิน'),
           diag: String(er.diag_text || ''),
           cc: String(er.cc || ''),
@@ -518,9 +547,171 @@ router.get('/visit-data/:vn', async (req, res) => {
     }
 
 
+    // 4. Sepsis / qSOFA Screening Alert
+    let sepsisAlert = null;
+    try {
+      const rrVal = Number(screening.rr) || 0;
+      const bpsVal = Number(screening.bps) || 0;
+      const tempVal = Number(screening.temperature) || 0;
+      const pulseVal = Number(screening.pulse) || 0;
+      const amsLevel = Number(screening.consciousness_level_type_id) || 1;
+      
+      const textForAms = `${screening.cc || ''} ${screening.pe || ''} ${screening.pe_ga_text || ''} ${screening.pe_neuro_text || ''}`.toLowerCase();
+      const amsKeyword = /ซึม|สับสน|ไม่ค่อยรู้ตัว|ไม่ตอบสนอง|ปลุกไม่ตื่น|drowsy|stupor|coma|confusion|altered mental/i.test(textForAms);
+      const hasAms = (amsLevel > 1) || amsKeyword;
+      
+      const rrMet = (rrVal >= 22);
+      const bpsMet = (bpsVal > 0 && bpsVal <= 100);
+      
+      let qsofaScore = 0;
+      if (rrMet) qsofaScore++;
+      if (bpsMet) qsofaScore++;
+      if (hasAms) qsofaScore++;
+      
+      const hasFever = (tempVal >= 38.0 || (tempVal > 0 && tempVal < 36.0));
+      const hasTachycardia = (pulseVal >= 90);
+      const diagTextAll = diagnoses.map(d => `${d.icd10 || ''} ${d.name || ''}`).join(' ').toLowerCase();
+      const isInfectionDiag = /sepsis|septic|shock|pneumonia|pyelonephritis|uti|cellulitis|bacteremia|cholangitis|appendicitis|peritonitis|ติดเชื้อ|ปอดอักเสบ|กรวยไต|หนอง|a41|j18|n390|k35|k81|k830/i.test(diagTextAll);
+      const isSuspectedInfection = hasFever || hasTachycardia || isInfectionDiag || /ไข้|หนาวสั่น|fever|chills/i.test(screening.cc || '');
+      
+      if (qsofaScore >= 2 || (qsofaScore === 1 && isSuspectedInfection && (hasFever || rrVal >= 24 || bpsVal <= 90))) {
+        const isCritical = (qsofaScore >= 2);
+        sepsisAlert = {
+          hasAlert: true,
+          severity: isCritical ? 'critical' : 'warning',
+          qsofaScore,
+          criteria: {
+            rr: { met: rrMet, val: rrVal ? `${rrVal} /min` : '-' },
+            bps: { met: bpsMet, val: bpsVal ? `${bpsVal} mmHg` : '-' },
+            ams: { met: hasAms, val: amsLevel > 1 ? (amsLevel === 2 ? 'สนองต่อเสียงเรียก (V)' : amsLevel === 3 ? 'ตอบสนองต่อความเจ็บปวด (P)' : 'หมดสติ (U)') : (amsKeyword ? 'มีภาวะซึม/สับสน' : 'ปกติ (A)') }
+          },
+          vitals: {
+            temp: tempVal ? `${tempVal.toFixed(1)} °C` : '-',
+            pulse: pulseVal ? `${pulseVal} bpm` : '-',
+            spo2: screening.spo2 ? `${screening.spo2}%` : '-'
+          },
+          title: isCritical 
+            ? `⚠️ วิกฤต: เสี่ยงภาวะ Sepsis (qSOFA Score ${qsofaScore}/3)`
+            : `⚠️ เฝ้าระวัง Sepsis เบื้องต้น (qSOFA Score ${qsofaScore}/3)`,
+          message: isCritical
+            ? 'ผู้ป่วยมีเกณฑ์ qSOFA ≥ 2 ข้อ ร่วมกับมีไข้/สงสัยภาวะติดเชื้อ เสี่ยงต่อภาวะช็อกและอวัยวะล้มเหลวเฉียบพลัน'
+            : 'พบเกณฑ์ qSOFA ร่วมกับสัญญาณชีพติดเชื้อ ควรเฝ้าระวังการติดเชื้อในกระแสเลือดอย่างใกล้ชิด',
+          guidance: isCritical
+            ? 'พิจารณาเปิดเส้น IV, ส่งตรวจ CBC, Blood Culture x 2, Serum Lactate, ให้สารน้ำ และยาปฏิชีวนะตาม Sepsis Protocol โดยด่วน'
+            : 'ตรวจติดตามสัญญาณชีพซ้ำทุก 1-2 ชม., ประเมินหาตำแหน่งการติดเชื้อ และพิจารณาเจาะเลือดตรวจเพิ่มเติม'
+        };
+      }
+    } catch (sepsisErr) {
+      console.warn('[assistant] Sepsis alert error:', sepsisErr.code || sepsisErr.name || 'error');
+    }
+
+    // 5. Dengue Hemoconcentration / Hct Rise Alert
+    let dengueAlert = null;
+    try {
+      const diagTextAll = diagnoses.map(d => `${d.icd10 || ''} ${d.name || ''}`).join(' ').toLowerCase();
+      const isDengueDiag = /a90|a91|a97|dengue|ไข้เลือดออก/i.test(diagTextAll);
+      const ccText = String(screening.cc || '').toLowerCase();
+      const isDengueCc = /dengue|ไข้เลือดออก/i.test(ccText);
+      const hasFever = (Number(screening.temperature) >= 38.0) || /ไข้|fever/i.test(ccText);
+      
+      let currHct = null;
+      let currPlt = null;
+      let isDengueLabPositive = false;
+      
+      for (const group of labResults) {
+        for (const item of (group.items || [])) {
+          const itemName = String(item.name || '').toLowerCase();
+          const resVal = String(item.result || '').trim();
+          const numVal = parseFloat(resVal.replace(/,/g, ''));
+          
+          if (/hematocrit|hct/i.test(itemName) && !isNaN(numVal) && numVal > 0) {
+            currHct = numVal;
+          } else if (/platelet/i.test(itemName) && !/smear|crit/i.test(itemName) && !isNaN(numVal) && numVal > 0) {
+            currPlt = numVal;
+          } else if (/dengue/i.test(itemName) && /positive|reactive|พบเชื้อ/i.test(resVal)) {
+            isDengueLabPositive = true;
+          }
+        }
+      }
+      
+      const isSuspectedDengue = isDengueDiag || isDengueCc || isDengueLabPositive || (hasFever && (currPlt !== null && currPlt <= 150000));
+      
+      if (isSuspectedDengue || (currHct !== null && currPlt !== null && currPlt <= 100000)) {
+        let baselineHct = null;
+        let baselineDate = null;
+        try {
+          const [baseHctRows] = await db.execute(`
+            SELECT lo.lab_order_result, DATE_FORMAT(lh.order_date, '%Y-%m-%d') AS order_date
+            FROM lab_order lo
+            JOIN lab_head lh ON lo.lab_order_number = lh.lab_order_number
+            JOIN lab_items li ON lo.lab_items_code = li.lab_items_code
+            WHERE lh.hn = ? AND (lh.vn != ? OR lh.order_date < ?)
+              AND (li.lab_items_name LIKE '%Hematocrit%' OR li.lab_items_name LIKE '%Hct%')
+              AND lo.lab_order_result IS NOT NULL AND lo.lab_order_result != ''
+            ORDER BY lh.order_date DESC, lh.order_time DESC
+            LIMIT 1
+          `, [visit.hn, vn, visit.vstdate]);
+          if (baseHctRows[0]) {
+            const parsed = parseFloat(String(baseHctRows[0].lab_order_result).replace(/,/g, ''));
+            if (!isNaN(parsed) && parsed > 0) {
+              baselineHct = parsed;
+              baselineDate = baseHctRows[0].order_date;
+            }
+          }
+        } catch (_) {}
+        
+        let hctRisePct = null;
+        if (currHct && baselineHct && baselineHct > 0) {
+          hctRisePct = Math.round(((currHct - baselineHct) / baselineHct) * 100);
+        }
+        
+        const isHemoconcentration = (hctRisePct !== null && hctRisePct >= 20) || (currHct !== null && currHct >= 48 && currPlt !== null && currPlt <= 100000);
+        const isThrombocytopenia = (currPlt !== null && currPlt <= 100000);
+        const isSevereDrop = (currPlt !== null && currPlt <= 50000);
+        
+        if (isHemoconcentration || isThrombocytopenia || isDengueLabPositive || isDengueDiag) {
+          const isCritical = isHemoconcentration || isSevereDrop;
+          dengueAlert = {
+            hasAlert: true,
+            severity: isCritical ? 'critical' : 'warning',
+            isDengueDiag,
+            isDengueLabPositive,
+            isHemoconcentration,
+            currHct: currHct !== null ? `${currHct}%` : '-',
+            baselineHct: baselineHct !== null ? `${baselineHct}% (${thaiDate(baselineDate)})` : 'ไม่พบประวัติเดิม',
+            hctRisePct: hctRisePct !== null ? `${hctRisePct >= 0 ? '+' : ''}${hctRisePct}%` : null,
+            currPlt: currPlt !== null ? `${currPlt.toLocaleString()} /uL` : '-',
+            title: isCritical
+              ? '🦟 วิกฤต: เฝ้าระวังไข้เลือดออกระยะวิกฤต (Plasma Leakage / DHF)'
+              : '🦟 เฝ้าระวังไข้เลือดออก (Dengue with Warning Signs)',
+            message: isHemoconcentration
+              ? `พบภาวะ Hemoconcentration (Hct เพิ่มขึ้น ${hctRisePct !== null ? hctRisePct + '%' : 'สูงวิกฤต'}) ร่วมกับเกล็ดเลือดต่ำ (${currPlt?.toLocaleString()} /uL) สงสัยการรั่วของพลาสมาเข้าสู่ช่องเยื่อหุ้ม`
+              : (isThrombocytopenia
+                ? `พบเกล็ดเลือดต่ำ (${currPlt?.toLocaleString()} /uL) ในผู้ป่วยสงสัยไข้เลือดออก เฝ้าระวังสัญญาณเตือนภาวะวิกฤต`
+                : (isDengueLabPositive
+                  ? 'ผลตรวจแอนติเจนไข้เลือดออกเป็นบวก (Dengue Positive) แนะนำติดตามการดำเนินของโรค'
+                  : 'ผู้ป่วยได้รับการวินิจฉัยสงสัยไข้เลือดออก ควรติดตามผลตรวจเลือดอย่างต่อเนื่อง')),
+            guidance: isCritical
+              ? 'ระวังภาวะ Dengue Shock Syndrome (DSS) แนะนำตรวจ CBC ติดตาม Hct ซ้ำทุก 4-6 ชม., ปรับสารน้ำอย่างระมัดระวังตามเกณฑ์ Dengue CPG, หลีกเลี่ยง Fluid Overload'
+              : 'แนะนำตรวจ CBC ติดตาม Hct และ Platelet ซ้ำทุก 12-24 ชม., สังเกต Warning Signs (ปวดท้อง, อาเจียนรุนแรง, เลือดออก), ห้ามใช้ยา NSAIDs / Aspirin / สเตียรอยด์'
+          };
+        }
+      }
+    } catch (dengueErr) {
+      console.warn('[assistant] Dengue alert error:', dengueErr.code || dengueErr.name || 'error');
+    }
+
+
     const payload = {
       success: true,
-      visit: { ...visit, vstdate_thai: thaiDateFull(visit.vstdate), appointment, is_on_warfarin: /warfarin/i.test(`${patient.drugallergy || ''} ${screening.pmh || ''} ${medications.map(m => m.name).join(' ')}`) },
+      visit: {
+        ...visit,
+        vstdate_thai: thaiDateFull(visit.vstdate),
+        vstdate_thai_short: thaiDateShort(visit.vstdate),
+        vsttime_short: visit.vsttime ? String(visit.vsttime).slice(0, 5) : '',
+        appointment,
+        is_on_warfarin: /warfarin/i.test(`${patient.drugallergy || ''} ${screening.pmh || ''} ${medications.map(m => m.name).join(' ')}`)
+      },
       patient: { ...patient, hn: visit.hn, age, age_y: age, age_text: age ? `${age} ปี ${stats[0]?.age_m ? `${stats[0].age_m} เดือน` : ''}`.trim() : '', sex: String(patient.sex) === '1' ? 'ชาย' : String(patient.sex) === '2' ? 'หญิง' : 'ไม่ระบุ' },
       allergyStatus,
       allergies: positiveAllergyRows,
@@ -529,6 +720,8 @@ router.get('/visit-data/:vn', async (req, res) => {
       readmission28d,
       careGap,
       recentMeds30d,
+      sepsisAlert,
+      dengueAlert,
       screening: { ...screening, cr: creatinine ? creatinine.toFixed(2) : '0', egfr: egfr ? egfr.toFixed(1) : '0', crcl: crcl ? crcl.toFixed(1) : '', stage: egfr >= 90 ? '1' : egfr >= 60 ? '2' : egfr >= 30 ? '3' : egfr >= 15 ? '4' : egfr ? '5' : '-' },
       diagnoses: diagnosesOut, medications, labResults
     };
@@ -549,8 +742,19 @@ router.get('/search', async (req, res) => {
     const db = getPool();
     let rows;
     if (/^\d{12}$/.test(q)) {
-      [rows] = await db.execute(`SELECT o.vn,o.hn,o.vstdate,p.cid,CONCAT(IFNULL(p.pname,''),p.fname,' ',p.lname) AS patient_name,
+      [rows] = await db.execute(`SELECT o.vn,o.hn,o.an,o.vstdate,p.cid,CONCAT(IFNULL(p.pname,''),p.fname,' ',p.lname) AS patient_name,
         TIMESTAMPDIFF(YEAR,p.birthday,CURDATE()) AS age,p.sex FROM ovst o LEFT JOIN patient p ON p.hn=o.hn WHERE o.vn=? LIMIT ?`, [q, limit]);
+    } else if (/^\d{9}$/.test(q)) {
+      [rows] = await db.execute(`SELECT o.vn,o.hn,o.an,o.vstdate,p.cid,CONCAT(IFNULL(p.pname,''),p.fname,' ',p.lname) AS patient_name,
+        TIMESTAMPDIFF(YEAR,p.birthday,CURDATE()) AS age,p.sex FROM ovst o LEFT JOIN patient p ON p.hn=o.hn WHERE o.an=? LIMIT ?`, [q, limit]);
+      if (!rows.length) {
+        const hn = q.padStart(7, '0');
+        [rows] = await db.execute(`SELECT p.hn,p.cid,CONCAT(IFNULL(p.pname,''),p.fname,' ',p.lname) AS patient_name,
+          TIMESTAMPDIFF(YEAR,p.birthday,CURDATE()) AS age,p.sex,
+          (SELECT o.vn FROM ovst o WHERE o.hn=p.hn ORDER BY o.vstdate DESC,o.vsttime DESC LIMIT 1) AS vn,
+          (SELECT MAX(o.vstdate) FROM ovst o WHERE o.hn=p.hn) AS vstdate
+          FROM patient p WHERE p.hn=? OR p.hn LIKE ? OR p.cid LIKE ? ORDER BY p.hn=? DESC LIMIT ?`, [hn, `${q}%`, `${q}%`, hn, limit]);
+      }
     } else if (/^\d+$/.test(q)) {
       const hn = q.padStart(7, '0');
       [rows] = await db.execute(`SELECT p.hn,p.cid,CONCAT(IFNULL(p.pname,''),p.fname,' ',p.lname) AS patient_name,
@@ -623,7 +827,20 @@ router.get('/patient-vitals-history/:hn', async (req, res) => {
 
 router.get('/patient-lab-history/:hn', async (req, res) => {
   const hn = String(req.params.hn || '');
-  const type = String(req.query.type || 'cr').toLowerCase().replace(/[^a-z0-9_ -]/g, '').trim();
+  const rawType = String(req.query.type || 'cr').toLowerCase().replace(/[^a-z0-9_ -]/g, '').trim();
+  const typeAliases = {
+    hematocrit: 'hct',
+    hematocrit2: 'hct',
+    haematocrit: 'hct',
+    haematocrit2: 'hct',
+    potassium: 'k',
+    sodium: 'na',
+    plt: 'platelet',
+    'platelet count': 'platelet',
+    sgot: 'ast',
+    sgpt: 'alt'
+  };
+  const type = typeAliases[rawType] || rawType;
   const matches = {
     cr: "(li.lab_items_name LIKE '%Creatinine%' OR li.lab_items_name LIKE '%eGFR%' OR li.lab_items_name LIKE '%ClCr%')",
     creatinine: "(li.lab_items_name LIKE '%Creatinine%' OR li.lab_items_name LIKE '%eGFR%' OR li.lab_items_name LIKE '%ClCr%')",
@@ -632,8 +849,8 @@ router.get('/patient-lab-history/:hn', async (req, res) => {
     ldl: "(li.lab_items_name LIKE '%LDL%' OR li.lab_items_name LIKE '%Low density%')",
     hct: "(li.lab_items_name LIKE '%Hematocrit%' OR li.lab_items_name LIKE '%Hct%')",
     uacr: "(li.lab_items_name LIKE '%UACR%' OR li.lab_items_name LIKE '%Albumin Creatinine Ratio%' OR li.lab_items_name LIKE '%Urine ACR%')",
-    k: "(li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%')",
-    potassium: "(li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%')",
+    k: "((li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%') AND li.lab_items_name NOT LIKE '%gap%')",
+    potassium: "((li.lab_items_name LIKE '%Potassium%' OR li.lab_items_name='K' OR li.lab_items_name LIKE 'K (%') AND li.lab_items_name NOT LIKE '%gap%')",
     na: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
     sodium: "(li.lab_items_name LIKE '%Sodium%' OR li.lab_items_name='Na' OR li.lab_items_name LIKE 'Na (%')",
     bun: "li.lab_items_name LIKE '%BUN%'", uric: "li.lab_items_name LIKE '%Uric%'",

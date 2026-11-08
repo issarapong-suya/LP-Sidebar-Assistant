@@ -13,7 +13,7 @@ const app = express();
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const PRODUCT_VERSION = '1';
-const PRODUCT_BUILD = '20261107.19';
+const PRODUCT_BUILD = '20261108.02';
 const companionSessions = new Map();
 const manualSessions = new Map();
 const enrollmentCodes = new Map();
@@ -239,7 +239,7 @@ app.get('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
         details.ldl.push({ code, name });
       }
 
-      if (/^hct$/i.test(name) || /^hematocrit$/i.test(name) || /^haematocrit$/i.test(name)) {
+      if (/^hct\d*$/i.test(name) || /^h[ae]?matocrit\d*$/i.test(name)) {
         if (!/gas/i.test(nameLower)) {
           detected.hct.push(code);
           details.hct.push({ code, name });

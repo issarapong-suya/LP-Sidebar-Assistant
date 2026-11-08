@@ -73,6 +73,7 @@
         <div class="vn-left">
           <span class="vn-label">VN:</span>
           <span class="vn-val" id="patientVn">-</span>
+          <span class="vn-datetime-pill" id="patientVnDatetime" style="display: none;"></span>
           <button type="button" class="btn-select-visit" id="btnSelectVisit" title="เลือกดู Visit อื่นๆ ของคนไข้ท่านนี้">🗓️ เลือก Visit ▾</button>
         </div>
         <div class="vn-controls">
@@ -111,6 +112,38 @@
     <section class="allergy-banner allergy-unknown" id="allergyBanner" role="status" aria-live="polite" hidden>
       <div class="allergy-banner-title"><span aria-hidden="true">⚠️</span><strong>ประวัติแพ้ยา</strong><span class="allergy-status-label" id="allergyStatusLabel">ยังไม่ทราบ</span></div>
       <div class="allergy-banner-detail" id="allergyDetail">ยังไม่มีข้อมูลประวัติแพ้ยาในระบบ (ข้อมูลไม่ครบไม่ได้แปลว่าไม่มีประวัติแพ้ยา)</div>
+    </section>
+
+    <!-- แจ้งเตือน: ภาวะติดเชื้อในกระแสเลือด (Sepsis / qSOFA Alert) -->
+    <section class="clinical-alert-banner sepsis-banner" id="sepsisBanner" role="alert" style="display: none;">
+      <div class="alert-head">
+        <span class="alert-icon" id="sepsisIcon">⚠️</span>
+        <div class="alert-title-wrap">
+          <strong class="alert-title" id="sepsisTitle">เฝ้าระวัง Sepsis (qSOFA Score)</strong>
+          <span class="alert-badge badge-critical" id="sepsisBadge">qSOFA 0/3</span>
+        </div>
+      </div>
+      <div class="alert-body" id="sepsisBody">
+        <div class="alert-message" id="sepsisMessage">-</div>
+        <div class="alert-criteria-pills" id="sepsisCriteria"></div>
+        <div class="alert-guidance-box" id="sepsisGuidance"></div>
+      </div>
+    </section>
+
+    <!-- แจ้งเตือน: เฝ้าระวังไข้เลือดออก (Dengue / Plasma Leakage Alert) -->
+    <section class="clinical-alert-banner dengue-banner" id="dengueBanner" role="alert" style="display: none;">
+      <div class="alert-head">
+        <span class="alert-icon">🦟</span>
+        <div class="alert-title-wrap">
+          <strong class="alert-title" id="dengueTitle">เฝ้าระวังไข้เลือดออก (Dengue Alert)</strong>
+          <span class="alert-badge badge-warn" id="dengueBadge">-</span>
+        </div>
+      </div>
+      <div class="alert-body" id="dengueBody">
+        <div class="alert-message" id="dengueMessage">-</div>
+        <div class="alert-criteria-pills" id="dengueMetrics"></div>
+        <div class="alert-guidance-box" id="dengueGuidance"></div>
+      </div>
     </section>
 
     <!-- แจ้งเตือนฉุกเฉิน: กลับมาตรวจซ้ำที่ห้องฉุกเฉิน (ER Revisit ภายใน 48 ชม.) -->
@@ -216,7 +249,10 @@
           <span>แจ้งเตือนผลแล็บ</span>
           <span class="badge-count" id="labCountBadge">0</span>
         </div>
-        <button type="button" class="btn-lab-header-trend" id="btnLabTrendHeader" title="คลิกเพื่อดูกราฟแนวโน้มผลแล็บย้อนหลัง">📈 ดูกราฟแนวโน้มแล็บ</button>
+        <div class="card-actions-group" style="display: flex; align-items: center; gap: 6px;">
+          <button type="button" class="btn-toggle-all-labs" id="btnToggleAllLabs" style="display: none;" onclick="toggleAllLabOrders()" title="ย่อ/ขยายทุกใบสั่งตรวจ">📂 ย่อ/ขยายทั้งหมด</button>
+          <button type="button" class="btn-lab-header-trend" id="btnLabTrendHeader" title="คลิกเพื่อดูกราฟแนวโน้มผลแล็บย้อนหลัง">📈 ดูกราฟแนวโน้มแล็บ</button>
+        </div>
       </div>
       <div class="lab-list" id="labAlertList">
         <div class="empty-state">ไม่มีผลแล็บผิดปกติใน Visit นี้</div>
