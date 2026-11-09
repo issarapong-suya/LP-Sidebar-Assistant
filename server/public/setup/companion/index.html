@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" href="/doctor-icon.png">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="stylesheet" href="/fonts/prompt.css">
-    <style>
+  <style>
     :root{font-family:Prompt,"Segoe UI",Tahoma,sans-serif;color:#183247;background:#f3f7fa;--green:#08796e;--muted:#64748b;--line:#e2eaf0}
     *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(ellipse at 95% 0%,#dff3ee 0,transparent 34%),#f3f7fa}
     .topbar{height:76px;background:#fff;border-bottom:1px solid #e6edf2;display:flex;justify-content:space-between;align-items:center;padding:0 clamp(18px,4vw,64px)}
@@ -14,129 +14,398 @@
     .brand small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:2px}
     .back{color:#326274;text-decoration:none;font-size:13px;font-weight:650;border:1px solid #dce8ed;background:#fff;border-radius:10px;padding:9px 14px;transition:all .15s}
     .back:hover{background:#f3faf8;border-color:#a6d3cb}
-    main{width:min(1160px,100%);padding:24px 20px 42px;margin:auto}
+    main{width:min(1180px,100%);padding:24px 20px 42px;margin:auto}
     .intro h1{font-size:clamp(26px,2.8vw,32px);margin:0;font-weight:800;color:#0f2738}
     .intro p{color:var(--muted);font-size:14.5px;margin:6px 0 20px;line-height:1.6}
-    .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
+    .grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:24px;align-items:start}
     .card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 32px #23415b0b;padding:24px}
     .card h2{margin:0 0 8px;font-size:18px;font-weight:800;color:#0f2738}
-    .card p{font-size:13.5px;color:#475569;line-height:1.65;margin:0 0 16px}
-    .btn{border:0;border-radius:11px;padding:12px 20px;font:inherit;font-size:14px;font-weight:750;cursor:pointer;background:var(--green);color:#fff;transition:all .15s}
+    .card p{font-size:13px;color:#475569;line-height:1.6;margin:0 0 16px}
+    .btn{border:0;border-radius:11px;padding:12px 20px;font:inherit;font-size:14px;font-weight:750;cursor:pointer;background:var(--green);color:#fff;transition:all .15s;text-align:center}
     .btn:hover:not(:disabled){background:#065b53;transform:translateY(-1px)}
     .btn:disabled{opacity:.55;cursor:wait}
-    .code-box{margin-top:16px;border:1px solid #cfe5df;background:#f1faf7;border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .code{font:700 22px Consolas,monospace;letter-spacing:.13em;color:#075f58;overflow-wrap:anywhere}
-    .expires{font-size:12px;color:#64748b;margin-top:6px}
-    .copy{background:#fff;border:1px solid #d5e5e4;color:#3e6870;border-radius:9px;padding:9px 13px;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+    .notice{margin-top:16px;padding:12px 14px;background:#fff8e9;border:1px solid #f0dfb1;border-radius:12px;color:#78350f;font-size:12px;line-height:1.6}
+    
+    /* Toolbar & Filters */
+    .toolbar{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+    .search-row{position:relative;width:100%}
+    .search-input{width:100%;height:40px;padding:0 14px 0 36px;border:1px solid #d4e0e8;border-radius:10px;font:inherit;font-size:13px;color:#0f2738;background:#fbfcfe;outline:none;transition:border-color .15s}
+    .search-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px #08796e14}
+    .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:#94a3b8;pointer-events:none}
+    .filter-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+    .filter-tab{border:1px solid #dbe5ec;background:#f8fafc;color:#64748b;font:inherit;font-size:12px;font-weight:650;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:all .15s}
+    .filter-tab:hover{background:#f1f5f9;color:#334155}
+    .filter-tab.active{background:#08796e;border-color:#08796e;color:#fff}
+    
+    /* Device List */
+    .device-list{display:grid;gap:10px}
+    .device{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid #e6edf1;border-radius:14px;padding:14px 16px;background:#fbfdfe;transition:border-color .15s,box-shadow .15s}
+    .device:hover{border-color:#c8d9e2;box-shadow:0 4px 14px #1b38500c}
+    .device-main{flex:1;min-width:0}
+    .device-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .device b{font-size:15px;font-weight:750;color:#0f2738}
+    .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;line-height:1.5}
+    .badge-online{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+    .badge-offline{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
+    .badge-ip{background:#eff6ff;color:#1e40af;border:1px solid #dbeafe}
+    .badge-gateway{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+    .badge-legacy{background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe}
+    .device-meta-row{display:flex;align-items:center;gap:12px;margin-top:6px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+    .device-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .revoke{border:1px solid #efd0ce;background:#fff7f6;color:#af4c46;border-radius:8px;padding:7px 13px;font:inherit;font-size:12px;font-weight:650;cursor:pointer;transition:all .15s}
+    .revoke:hover{background:#fee2e2;border-color:#e0a29e}
+    .btn-delete{border:1px solid #e2e8f0;background:#fff;color:#64748b;border-radius:8px;padding:7px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+    .btn-delete:hover{background:#fef2f2;color:#b91c1c;border-color:#fca5a5}
+    .revoked{color:#b45309;font-size:11.5px;font-weight:600;padding:4px 8px;background:#fffbeb;border:1px solid #fef3c7;border-radius:6px}
+
+    /* Pagination */
+    .pagination-bar{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid #eef3f7;font-size:12.5px;color:var(--muted);flex-wrap:wrap;gap:10px}
+    .pagination-controls{display:flex;align-items:center;gap:4px}
+    .page-btn{min-width:32px;height:32px;padding:0 8px;border:1px solid #dbe5ec;background:#fff;color:#334155;border-radius:8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+    .page-btn:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
+    .page-btn:disabled{opacity:.4;cursor:not-allowed}
+    .page-btn.active{background:var(--green);border-color:var(--green);color:#fff}
+    
     .status{min-height:22px;margin-top:12px;color:#64748b;font-size:12px}
     .status.error{color:#b54e48}
-    .device-list{display:grid;gap:10px}
-    .device{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e6edf1;border-radius:12px;padding:12px 14px;background:#fbfdfe}
-    .device b{display:block;font-size:14px;font-weight:700;color:#1e293b}
-    .device small{display:block;margin-top:4px;color:#64748b;font-size:11.5px}
-    .revoke{border:1px solid #efd0ce;background:#fff7f6;color:#af4c46;border-radius:9px;padding:8px 12px;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
-    .revoke:hover{background:#fee2e2}
-    .revoked{color:#9b6b3d;font-size:12px;font-weight:600}
-    .notice{margin-top:18px;padding:13px 16px;background:#fff8e9;border:1px solid #f0dfb1;border-radius:12px;color:#78350f;font-size:12.5px;line-height:1.65}
+    .empty-state{text-align:center;padding:36px 16px;color:#94a3b8;font-size:13.5px}
+    .empty-state span{display:block;font-size:28px;margin-bottom:8px}
     .footer{margin-top:20px;color:#8292a0;font-size:12px;display:flex;justify-content:space-between;gap:12px}
-    @media(max-width:760px){.grid{grid-template-columns:1fr}.card{padding:20px}.footer{flex-direction:column;gap:6px}}
+    @media(max-width:880px){.grid{grid-template-columns:1fr}.footer{flex-direction:column;gap:6px}}
   </style>
 </head>
 <body>
-  <header class="topbar"><div class="brand" style="display:flex;align-items:center;gap:12px"><img src="/doctor-icon.png" style="width:40px;height:40px;border-radius:10px;object-fit:contain;box-shadow:0 4px 12px rgba(8,121,110,0.18)" alt="Doctor Assistant Logo"><div>Sidebar Doctor Assistant<small style="font-size:11px;color:var(--muted)">ลงทะเบียนและจัดการเครื่อง Companion</small></div></div><a class="back" href="/setup/">← กลับหน้า Setup</a></header>
-  <main>
-    <div class="intro"><h1>จัดการ Companion</h1><p>ติดตั้งจากหน้า <a href="/install/">/install/</a> ได้โดยตรง ไม่ต้องกรอก URL หรือ activation code และเพิกถอนเครื่องที่ไม่ใช้งานได้จากหน้านี้</p></div>
-    <div class="grid">
-      <section class="card"><h2>ติดตั้งเครื่องใหม่</h2><p>เปิด HOSxP แล้วดาวน์โหลด Companion จากหน้า Install บนเครื่องนั้น จากนั้นเปิดไฟล์ที่ดาวน์โหลด โปรแกรมจะอ่าน Server URL จากลิงก์ดาวน์โหลดและลงทะเบียนเครื่องอัตโนมัติ</p><a class="btn" href="/install/" style="display:inline-block;text-decoration:none">ไปหน้าดาวน์โหลด Companion</a><div class="notice">เครื่องต้องอยู่ในเครือข่ายที่อนุญาต; workstation ใช้ HTTPS ส่วน localhost ใช้ HTTP ได้ โปรแกรมจัดการ token เบื้องหลังและบันทึกชื่อเครื่องในรายการด้านขวา</div></section>
-      <section class="card"><h2>เครื่องที่ลงทะเบียนแล้ว</h2><p>ดูสถานะและเพิกถอน token รายเครื่องได้จากที่นี่</p><div class="device-list" id="devices"></div><div class="status" id="deviceStatus"></div></section>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/doctor-icon.png" style="width:40px;height:40px;border-radius:10px;object-fit:contain;box-shadow:0 4px 12px rgba(8,121,110,0.18)" alt="Doctor Assistant Logo">
+      <div>
+        Sidebar Doctor Assistant
+        <small>ลงทะเบียนและจัดการเครื่อง Companion</small>
+      </div>
     </div>
-    <div class="footer"><span>หน้า Setup เปิดได้เฉพาะบนเครื่อง Server</span><span>token ภายในไม่แสดงบนหน้าเว็บหรือ audit log</span></div>
+    <a class="back" href="/setup/">← กลับหน้า Setup</a>
+  </header>
+  <main>
+    <div class="intro">
+      <h1>จัดการ Companion</h1>
+      <p>ตรวจสอบสถานะออนไลน์ IP เครื่องจริง และเพิกถอนเครื่องที่ไม่ใช้งานได้จากหน้านี้</p>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>ติดตั้งเครื่องใหม่</h2>
+        <p>เปิด HOSxP แล้วเปิดหน้า Install บนเครื่องนั้นเพื่อดาวน์โหลดโปรแกรมติดตั้ง Companion ระบบจะอ่าน Server URL และลงทะเบียนอัตโนมัติ</p>
+        <a class="btn" href="/install/" style="display:inline-block;text-decoration:none;width:100%">ไปหน้าดาวน์โหลด Companion</a>
+        <div class="notice">
+          <b>หมายเหตุ:</b><br>
+          • เครื่องลูกในวง LAN สามารถใช้งานผ่าน HTTP หรือ HTTPS ตามที่อนุญาต<br>
+          • ระบบจะแสดงทั้งชื่อเครื่อง (Computer Name), IP เครื่องลูกจริง, และ IP Socket Gateway (หากวิ่งผ่าน NAT/Firewall)
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>เครื่องที่ลงทะเบียนแล้ว</h2>
+        <p>ดูสถานะออนไลน์ IP เครื่องลูก และเพิกถอน token รายเครื่อง</p>
+        
+        <div class="toolbar">
+          <div class="search-row">
+            <span class="search-icon">🔍</span>
+            <input type="search" id="deviceSearch" class="search-input" placeholder="ค้นหาชื่อเครื่อง, IP, หรือชื่อผู้ใช้...">
+          </div>
+          <div class="filter-tabs">
+            <button type="button" class="filter-tab active" data-filter="all" id="tabAll">ทั้งหมด (0)</button>
+            <button type="button" class="filter-tab" data-filter="online" id="tabOnline">🟢 ออนไลน์ (0)</button>
+            <button type="button" class="filter-tab" data-filter="offline" id="tabOffline">⚪ ออฟไลน์ (0)</button>
+            <button type="button" class="filter-tab" data-filter="revoked" id="tabRevoked">เพิกถอนแล้ว (0)</button>
+          </div>
+        </div>
+
+        <div class="device-list" id="devices"></div>
+        <div class="pagination-bar" id="paginationBar" hidden>
+          <span id="pageInfo">แสดง 0-0 จาก 0 เครื่อง</span>
+          <div class="pagination-controls" id="pageControls"></div>
+        </div>
+        <div class="status" id="deviceStatus"></div>
+      </section>
+    </div>
+    <div class="footer">
+      <span>หน้า Setup เปิดได้เฉพาะบนเครื่อง Server หรือวงเครือข่ายที่อนุญาต</span>
+      <span>Token ภายในถูกจัดเก็บแบบ Secure Hash และไม่แสดงในหน้าเว็บ</span>
+    </div>
   </main>
   <script>
-    const el=id=>document.getElementById(id);
-    async function api(url,options={}){const response=await fetch(url,{cache:'no-store',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await response.json();if(!response.ok||!data.success)throw new Error(data.error||'ดำเนินการไม่สำเร็จ');return data}
-    function renderDevices(list){
-      const root=el('devices');
+    const el = id => document.getElementById(id);
+    let allDevices = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let currentPage = 1;
+    const PAGE_SIZE = 5;
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, {
+        cache: 'no-store',
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'ดำเนินการไม่สำเร็จ');
+      return data;
+    }
+
+    function updateCounts() {
+      const total = allDevices.length;
+      const online = allDevices.filter(d => d.isOnline).length;
+      const revoked = allDevices.filter(d => Boolean(d.revokedAt)).length;
+      const offline = allDevices.filter(d => !d.isOnline && !d.revokedAt).length;
+
+      el('tabAll').textContent = `ทั้งหมด (${total})`;
+      el('tabOnline').textContent = `🟢 ออนไลน์ (${online})`;
+      el('tabOffline').textContent = `⚪ ออฟไลน์ (${offline})`;
+      el('tabRevoked').textContent = `เพิกถอนแล้ว (${revoked})`;
+    }
+
+    function getFilteredDevices() {
+      let filtered = allDevices.slice();
+
+      // Filter by status tab
+      if (currentFilter === 'online') {
+        filtered = filtered.filter(d => d.isOnline);
+      } else if (currentFilter === 'offline') {
+        filtered = filtered.filter(d => !d.isOnline && !d.revokedAt);
+      } else if (currentFilter === 'revoked') {
+        filtered = filtered.filter(d => Boolean(d.revokedAt));
+      }
+
+      // Filter by search text
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        filtered = filtered.filter(d => {
+          const name = String(d.name || '').toLowerCase();
+          const user = String(d.currentUser || '').toLowerCase();
+          const clientIp = String(d.clientIp || '').toLowerCase();
+          const localIp = String(d.localIp || '').toLowerCase();
+          return name.includes(q) || user.includes(q) || clientIp.includes(q) || localIp.includes(q);
+        });
+      }
+
+      return filtered;
+    }
+
+    function renderPage() {
+      const filtered = getFilteredDevices();
+      const totalItems = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const startIndex = (currentPage - 1) * PAGE_SIZE;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems);
+      const pageItems = filtered.slice(startIndex, endIndex);
+
+      const root = el('devices');
       root.replaceChildren();
-      if(!list.length){
-        const empty=document.createElement('div');
-        empty.className='status';
-        empty.textContent='ยังไม่มีเครื่องที่ลงทะเบียน';
+
+      if (!totalItems) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = `<span>💻</span>${searchQuery ? 'ไม่พบเครื่องที่ตรงกับคำค้นหา' : 'ยังไม่มีเครื่องในหมวดหมู่นี้'}`;
         root.append(empty);
+        el('paginationBar').hidden = true;
         return;
       }
-      for(const device of list){
-        const row=document.createElement('div');
-        row.className='device';
-        const info=document.createElement('div');
-        const name=document.createElement('b');
-        name.textContent=device.name||'Companion workstation';
 
-        const statusLine=document.createElement('div');
-        statusLine.style.display='flex';
-        statusLine.style.alignItems='center';
-        statusLine.style.gap='6px';
-        statusLine.style.margin='4px 0 2px';
+      for (const device of pageItems) {
+        const row = document.createElement('div');
+        row.className = 'device';
 
-        const pill=document.createElement('span');
-        pill.style.fontSize='9px';
-        pill.style.padding='2px 8px';
-        pill.style.borderRadius='10px';
-        pill.style.fontWeight='600';
-        if(device.isOnline){
-          pill.style.background='#d1fae5';
-          pill.style.color='#065f46';
-          pill.textContent=`🟢 ออนไลน์${device.currentUser ? ` (${device.currentUser})` : ''}`;
+        const main = document.createElement('div');
+        main.className = 'device-main';
+
+        // Title row
+        const titleRow = document.createElement('div');
+        titleRow.className = 'device-name-row';
+
+        const name = document.createElement('b');
+        name.textContent = device.name || 'Companion workstation';
+        titleRow.append(name);
+
+        // Online / Offline badge
+        const statusBadge = document.createElement('span');
+        if (device.isOnline) {
+          statusBadge.className = 'badge badge-online';
+          statusBadge.textContent = `🟢 ออนไลน์${device.currentUser ? ` (${device.currentUser})` : ''}`;
+        } else if (device.revokedAt) {
+          statusBadge.className = 'badge badge-offline';
+          statusBadge.textContent = '⚪ ออฟไลน์';
         } else {
-          pill.style.background='#f1f5f9';
-          pill.style.color='#64748b';
-          pill.textContent='⚪ ออฟไลน์';
+          statusBadge.className = 'badge badge-offline';
+          statusBadge.textContent = '⚪ ออฟไลน์';
         }
-        statusLine.append(pill);
+        titleRow.append(statusBadge);
 
-        if(device.isLegacy){
-          const legPill=document.createElement('span');
-          legPill.style.fontSize='9px';
-          legPill.style.padding='2px 6px';
-          legPill.style.borderRadius='10px';
-          legPill.style.background='#fef3c7';
-          legPill.style.color='#92400e';
-          legPill.textContent='Shared Token';
-          statusLine.append(legPill);
+        // Real IP & Gateway IP Badges
+        const realIp = (device.localIp || '').trim();
+        const clientIp = (device.clientIp || '').trim();
+
+        if (realIp && clientIp && realIp !== clientIp) {
+          const ipBadge = document.createElement('span');
+          ipBadge.className = 'badge badge-ip';
+          ipBadge.title = 'IP เครื่องลูกจริง';
+          ipBadge.textContent = `IP เครื่อง: ${realIp}`;
+          titleRow.append(ipBadge);
+
+          const gwBadge = document.createElement('span');
+          gwBadge.className = 'badge badge-gateway';
+          gwBadge.title = 'IP Socket ผ่าน Gateway / NAT';
+          gwBadge.textContent = `ผ่าน Gateway: ${clientIp}`;
+          titleRow.append(gwBadge);
+        } else if (realIp || clientIp) {
+          const ipBadge = document.createElement('span');
+          ipBadge.className = 'badge badge-ip';
+          ipBadge.textContent = `IP: ${realIp || clientIp}`;
+          titleRow.append(ipBadge);
         }
 
-        const meta=document.createElement('small');
-        meta.textContent=`ลงทะเบียน ${new Date(device.createdAt).toLocaleString('th-TH')}`;
-        info.append(name,statusLine,meta);
-        row.append(info);
+        if (device.isLegacy) {
+          const legPill = document.createElement('span');
+          legPill.className = 'badge badge-legacy';
+          legPill.textContent = 'Shared Token';
+          titleRow.append(legPill);
+        }
 
-        if(device.revokedAt){
-          const state=document.createElement('span');
-          state.className='revoked';
-          state.textContent='เพิกถอนแล้ว';
-          row.append(state);
-        } else if(!device.isLegacy){
-          const button=document.createElement('button');
-          button.className='revoke';
-          button.textContent='เพิกถอน';
-          button.addEventListener('click',async()=>{
-            if(!confirm(`เพิกถอน Companion ของ ${device.name||'เครื่องนี้'} ใช่หรือไม่`)) return;
-            button.disabled=true;
-            try{
-              const result=await api(`/api/setup/companion/devices/${encodeURIComponent(device.id)}/revoke`,{method:'POST',body:'{}'});
-              renderDevices(result.devices);
-            }catch(error){
-              el('deviceStatus').className='status error';
-              el('deviceStatus').textContent=error.message;
-              button.disabled=false;
+        // Meta row
+        const metaRow = document.createElement('div');
+        metaRow.className = 'device-meta-row';
+        const dateStr = device.createdAt ? new Date(device.createdAt).toLocaleString('th-TH') : '-';
+        metaRow.innerHTML = `<span>ลงทะเบียนเมื่อ: ${dateStr}</span>`;
+        if (device.revokedAt) {
+          metaRow.innerHTML += `<span style="color:#b45309">เพิกถอนเมื่อ: ${new Date(device.revokedAt).toLocaleString('th-TH')}</span>`;
+        }
+
+        main.append(titleRow, metaRow);
+        row.append(main);
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'device-actions';
+
+        if (device.revokedAt) {
+          const state = document.createElement('span');
+          state.className = 'revoked';
+          state.textContent = 'เพิกถอนแล้ว';
+          actions.append(state);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'btn-delete';
+          delBtn.textContent = 'ลบรายการ';
+          delBtn.title = 'ลบประวัติเครื่องที่เพิกถอนแล้วออกจากรายการ';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm(`ต้องการลบรายการของ ${device.name || 'เครื่องนี้'} ออกจากระบบใช่หรือไม่?`)) return;
+            delBtn.disabled = true;
+            try {
+              await api(`/api/setup/companion/devices/${encodeURIComponent(device.id)}/delete`, { method: 'POST', body: '{}' });
+              allDevices = allDevices.filter(d => d.id !== device.id);
+              updateCounts();
+              renderPage();
+            } catch (err) {
+              alert(err.message);
+              delBtn.disabled = false;
             }
           });
-          row.append(button);
+          actions.append(delBtn);
+        } else if (!device.isLegacy) {
+          const button = document.createElement('button');
+          button.className = 'revoke';
+          button.textContent = 'เพิกถอน';
+          button.addEventListener('click', async () => {
+            if (!confirm(`เพิกถอนสิทธิ์ Companion ของ ${device.name || 'เครื่องนี้'} ใช่หรือไม่?`)) return;
+            button.disabled = true;
+            try {
+              const result = await api(`/api/setup/companion/devices/${encodeURIComponent(device.id)}/revoke`, { method: 'POST', body: '{}' });
+              await loadDevices();
+            } catch (error) {
+              el('deviceStatus').className = 'status error';
+              el('deviceStatus').textContent = error.message;
+              button.disabled = false;
+            }
+          });
+          actions.append(button);
         }
+
+        row.append(actions);
         root.append(row);
       }
+
+      // Render Pagination Bar
+      if (totalPages > 1 || totalItems > 0) {
+        el('paginationBar').hidden = false;
+        el('pageInfo').textContent = `แสดง ${startIndex + 1}-${endIndex} จาก ${totalItems} เครื่อง`;
+
+        const ctrl = el('pageControls');
+        ctrl.replaceChildren();
+
+        // Prev button
+        const prev = document.createElement('button');
+        prev.className = 'page-btn';
+        prev.textContent = '«';
+        prev.disabled = currentPage <= 1;
+        prev.title = 'หน้าก่อนหน้า';
+        prev.addEventListener('click', () => { currentPage--; renderPage(); });
+        ctrl.append(prev);
+
+        // Page buttons
+        for (let p = 1; p <= totalPages; p++) {
+          const pBtn = document.createElement('button');
+          pBtn.className = `page-btn ${p === currentPage ? 'active' : ''}`;
+          pBtn.textContent = p;
+          pBtn.addEventListener('click', () => { currentPage = p; renderPage(); });
+          ctrl.append(pBtn);
+        }
+
+        // Next button
+        const next = document.createElement('button');
+        next.className = 'page-btn';
+        next.textContent = '»';
+        next.disabled = currentPage >= totalPages;
+        next.title = 'หน้าถัดไป';
+        next.addEventListener('click', () => { currentPage++; renderPage(); });
+        ctrl.append(next);
+      } else {
+        el('paginationBar').hidden = true;
+      }
     }
-    api('/api/setup/companion/devices').then(data=>renderDevices(data.devices)).catch(error=>{el('deviceStatus').className='status error';el('deviceStatus').textContent=error.message});
+
+    async function loadDevices() {
+      try {
+        const data = await api('/api/setup/companion/devices');
+        allDevices = data.devices || [];
+        updateCounts();
+        renderPage();
+      } catch (error) {
+        el('deviceStatus').className = 'status error';
+        el('deviceStatus').textContent = error.message;
+      }
+    }
+
+    // Event Listeners for Filter Tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentFilter = tab.dataset.filter;
+        currentPage = 1;
+        renderPage();
+      });
+    });
+
+    // Search input
+    el('deviceSearch').addEventListener('input', e => {
+      searchQuery = e.target.value;
+      currentPage = 1;
+      renderPage();
+    });
+
+    // Initial Load & Auto Refresh every 5s
+    loadDevices();
+    setInterval(loadDevices, 5000);
   </script>
 </body>
 </html>

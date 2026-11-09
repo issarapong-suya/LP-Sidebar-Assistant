@@ -33,7 +33,7 @@ INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~"
 INSTALLED_EXE = os.path.join(INSTALL_DIR, "DoctorAssistantCompanion.exe")
 
 COMPANION_VERSION = "1"
-COMPANION_BUILD = "20261108.03"
+COMPANION_BUILD = "20261109.01"
 
 # ค่าเริ่มต้น (ไม่เก็บรหัสผ่านเป็น plain text ใน config.json เพื่อความปลอดภัยสูงสุด)
 DEFAULT_CONFIG = {
@@ -525,42 +525,113 @@ def bring_window_to_foreground(hwnd, maximize=True):
     except Exception:
         return False
 
-def focus_existing_assistant(bounds=None):
-    """ ค้นหาหน้าต่าง Sidebar Doctor Assistant และดึงขึ้นมาข้างหน้า พร้อมปรับขนาดตำแหน่งตาม bounds """
-    assistant_hwnd = [None]
+def get_default_sidebar_bounds():
+    """ คำนวณพิกัดและขนาดมาตรฐานของ Sidebar ชิดขอบจอด้านขวา """
+    try:
+        screen_w = user32.GetSystemMetrics(0)
+        screen_h = user32.GetSystemMetrics(1)
+        sidebar_w = 550
+        pos_x = max(0, screen_w - sidebar_w)
+        return {
+            "left": pos_x,
+            "top": 0,
+            "width": sidebar_w,
+            "height": screen_h - 40
+        }
+    except Exception:
+        return {"left": 800, "top": 0, "width": 550, "height": 900}
+
+def find_sidebar_window():
+    """ ค้นหาเฉพาะหน้าต่าง Sidebar Doctor Assistant ของจริง โดยตัดหน้าต่าง Google Chrome ปกติออก 100% """
+    try:
+        ensure_default_desktop()
+    except Exception:
+        pass
+
+    candidates = []
     def enum_cb(hwnd, lparam):
-        if user32.IsWindowVisible(hwnd):
-            cls_buf = ctypes.create_unicode_buffer(256)
-            user32.GetClassNameW(hwnd, cls_buf, 256)
-            cls_name = cls_buf.value
-            if cls_name in ["Chrome_WidgetWin_1", "MozillaWindowClass", "ApplicationFrameWindow"]:
-                length = user32.GetWindowTextLengthW(hwnd)
-                if length > 0:
-                    buff = ctypes.create_unicode_buffer(length + 1)
-                    user32.GetWindowTextW(hwnd, buff, length + 1)
-                    title = buff.value
-                    if "Doctor Assistant" in title or "ผู้ช่วยแพทย์" in title:
-                        assistant_hwnd[0] = hwnd
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        cls_buf = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, cls_buf, 256)
+        cls_name = cls_buf.value
+        if cls_name in ["Chrome_WidgetWin_1", "MozillaWindowClass", "ApplicationFrameWindow"]:
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buff = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buff, length + 1)
+                title = buff.value
+                
+                # กรองหน้าต่างทั่วไปที่ไม่ใช่ Sidebar
+                if any(ex in title for ex in ["Hospital setup center", "ติดตั้ง Companion", "จัดการอุปกรณ์", "Google Search", "YouTube", "GitHub"]):
+                    return True
+                
+                rect = wintypes.RECT()
+                user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                w = rect.right - rect.left
+                h = rect.bottom - rect.top
+
+                score = 0
+                if "ผู้ช่วยแพทย์หน้าจอทำงาน" in title or "Sidebar Doctor Assistant –" in title:
+                    score += 100
+                elif "หน้าจอทำงาน" in title:
+                    score += 80
+                elif "Doctor Assistant" in title or "ผู้ช่วยแพทย์" in title:
+                    score += 20
+
+                # หน้าต่าง Sidebar จะเป็นแถบแนวตั้ง (กว้างประมาณ 400-750px)
+                if 350 <= w <= 750:
+                    score += 50
+                elif w > 850:
+                    score -= 100 # หน้าต่างเบราว์เซอร์ปกติจะกว้างเกิน 900px ปรับลดแต้มทันที
+
+                if "- Google Chrome" in title and "หน้าจอทำงาน" not in title:
+                    score -= 100
+
+                if score > 0:
+                    candidates.append((score, hwnd))
         return True
+
     cb = WNDENUMPROC(enum_cb)
     user32.EnumWindows(cb, 0)
-    if assistant_hwnd[0]:
-        h = assistant_hwnd[0]
-        try:
-            # คืนสถานะถ้าถูกย่อ (Un-minimize)
-            if user32.IsIconic(h):
-                user32.ShowWindow(h, 9) # SW_RESTORE
-            else:
-                user32.ShowWindow(h, 5) # SW_SHOW
-            if bounds:
-                user32.SetWindowPos(h, 0, bounds['left'], bounds['top'], bounds['width'], bounds['height'], 0x0040)
-            # เด้งมาอยู่บนสุดเหนือหน้าต่างโปรแกรมอื่นทันที แล้วปลดกลับให้อยู่ระดับปกติ
-            user32.SetWindowPos(h, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040) # HWND_TOPMOST
-            user32.SetWindowPos(h, -2, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040) # HWND_NOTOPMOST
-        except Exception:
-            pass
-        return bring_window_to_foreground(h, maximize=False)
-    return False
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    if candidates[0][0] >= 50:
+        return candidates[0][1]
+    return None
+
+def focus_existing_assistant(bounds=None, activate=True):
+    """ ค้นหาหน้าต่าง Sidebar Doctor Assistant และดึงขึ้นมาแสดงข้างหน้า โดยไม่ดึงหน้าต่างเบราว์เซอร์อื่นขึ้นมา """
+    bounds = bounds or get_default_sidebar_bounds()
+    h = find_sidebar_window()
+    if not h:
+        return False
+    try:
+        SWP_NOACTIVATE = 0x0010
+        SWP_SHOWWINDOW = 0x0040
+
+        # คืนสถานะถ้าถูกย่อ
+        if user32.IsIconic(h):
+            user32.ShowWindow(h, 9) # SW_RESTORE
+        else:
+            user32.ShowWindow(h, 4 if not activate else 5) # SW_SHOWNOACTIVATE vs SW_SHOW
+
+        # บังคับตำแหน่งและขนาดให้เป็น Sidebar เสมอ (กว้าง 550px ชิดขวา)
+        flags = SWP_SHOWWINDOW | (SWP_NOACTIVATE if not activate else 0)
+        user32.SetWindowPos(h, 0, bounds['left'], bounds['top'], bounds['width'], bounds['height'], flags)
+
+        # นำมาแสดงด้านบนสุด
+        top_flags = 0x0001 | 0x0002 | SWP_SHOWWINDOW | (SWP_NOACTIVATE if not activate else 0)
+        user32.SetWindowPos(h, -1, 0, 0, 0, 0, top_flags) # HWND_TOPMOST
+        user32.SetWindowPos(h, -2, 0, 0, 0, 0, top_flags) # HWND_NOTOPMOST
+
+        if activate:
+            return bring_window_to_foreground(h, maximize=False)
+        return True
+    except Exception as e:
+        print("[Companion] focus_existing_assistant error:", e)
+        return False
 
 user32.DestroyMenu.argtypes = [wintypes.HMENU]
 user32.DestroyWindow.argtypes = [wintypes.HWND]
@@ -1086,7 +1157,8 @@ class FloatingDoctorApp:
 
                 payload = json.dumps({
                     "ticket": ticket,
-                    "deviceName": socket.gethostname() or os.environ.get("COMPUTERNAME", "HOSxP workstation")
+                    "deviceName": socket.gethostname() or os.environ.get("COMPUTERNAME", "HOSxP workstation"),
+                    "localIp": get_local_lan_ip(server_host)
                 }).encode("utf-8")
                 request = urllib.request.Request(
                     f"{server_url}/api/install/enroll",
@@ -1160,16 +1232,7 @@ class FloatingDoctorApp:
             vn = patient.get("vn") if patient else None
             hn = patient.get("hn", "") if patient else ""
 
-            screen_w = user32.GetSystemMetrics(0)
-            screen_h = user32.GetSystemMetrics(1)
-            sidebar_w = 550
-            pos_x = max(0, screen_w - sidebar_w)
-            bounds = {
-                "left": pos_x,
-                "top": 0,
-                "width": sidebar_w,
-                "height": screen_h - 40
-            }
+            bounds = get_default_sidebar_bounds()
 
             # Keep workstation identity and patient identifiers out of the browser URL/history.
             assistant_url = f"{server_url}/assistant/"
@@ -1424,7 +1487,7 @@ $form.ShowDialog()
                     # หากเลือกคนไข้ใหม่บน HOSxP ให้ sidebar หน้าต่างเดิมเด้งมาแสดง top บนโปรแกรมที่เปิดอยู่ทันที
                     if vn_changed and self.last_vn:
                         try:
-                            focus_existing_assistant()
+                            focus_existing_assistant(activate=False)
                         except Exception:
                             pass
             except Exception as error:

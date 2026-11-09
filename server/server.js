@@ -13,7 +13,7 @@ const app = express();
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const PRODUCT_VERSION = '1';
-const PRODUCT_BUILD = '20261108.03';
+const PRODUCT_BUILD = '20261109.01';
 const companionSessions = new Map();
 const manualSessions = new Map();
 const enrollmentCodes = new Map();
@@ -99,7 +99,27 @@ function isAllowed(req, config) {
 
 function localSetupOnly(req, res, next) {
   if (isLocal(req) && !req.get('x-forwarded-for')) return next();
-  return res.status(403).json({ success: false, error: 'หน้านี้เปิดได้จากเครื่อง Server เท่านั้น (ใช้ http://localhost:<port>/setup)' });
+  const config = db.getConfig();
+  if (config?.security?.allowRemoteSetup === true && isAllowed(req, config)) {
+    return next();
+  }
+  if (process.env.ALLOW_REMOTE_SETUP === 'true' && (!config || isAllowed(req, config))) {
+    return next();
+  }
+  if (req.accepts('html') && !req.path.startsWith('/api/')) {
+    return res.status(403).send(`
+      <!DOCTYPE html><html><head><meta charset="utf-8"><title>Setup Restricted</title>
+      <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;}
+      .card{max-width:520px;background:#fff;padding:32px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,0.08);text-align:center;}
+      h2{color:#0f2738;margin-top:0;}p{color:#64748b;line-height:1.6;font-size:14.5px;}code{background:#f1f5f9;padding:4px 8px;border-radius:6px;color:#0f766e;}
+      </style></head><body><div class="card">
+      <h2>🔒 จำกัดการเข้าถึงหน้า Setup</h2>
+      <p>ตามค่าความปลอดภัยเริ่มต้น หน้า Setup อนุญาตให้เปิดจากเครื่อง Server เท่านั้น (<code>http://localhost:3030/setup</code>)</p>
+      <p>หากแอดมินต้องการเปิดจากเครื่องทำงานในวง LAN ให้เปิดตัวเลือก <b>"อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN"</b> ในหน้าตั้งค่า หรือใส่ <code>"allowRemoteSetup": true</code> ใน <code>config.json</code> ของเซิร์ฟเวอร์</p>
+      </div></body></html>
+    `);
+  }
+  return res.status(403).json({ success: false, error: 'หน้านี้เปิดได้จากเครื่อง Server เท่านั้น (ใช้ http://localhost:<port>/setup) หรือเปิด allowRemoteSetup ในไฟล์ตั้งค่า' });
 }
 
 function persistConfig(config) {
@@ -124,7 +144,7 @@ function createInstallTicket(ip) {
 
 function secureForEnrollment(req) {
   const config = db.getConfig();
-  if (config?.security?.allowInsecureEnrollment === true) return true;
+  if (config?.security?.allowInsecureEnrollment !== false) return true;
   return requestIsSecure(req);
 }
 
@@ -273,7 +293,11 @@ app.get('/api/setup/status', localSetupOnly, (req, res) => {
     hospitalName: config.hospitalName || '',
     hospitalCode: config.hospitalCode || '',
     hosxp: { host: config.hosxp?.host || '', port: config.hosxp?.port || 3306, database: config.hosxp?.database || '', user: config.hosxp?.user || '' },
-    security: { allowedLanSubnets: config.security?.allowedLanSubnets || ['127.0.0.1', '::1'] },
+    security: {
+      allowedLanSubnets: config.security?.allowedLanSubnets || ['127.0.0.1', '::1'],
+      allowInsecureEnrollment: config.security?.allowInsecureEnrollment !== false,
+      allowRemoteSetup: config.security?.allowRemoteSetup === true
+    },
     schema: {
       creatinineLabCode: config.schema?.creatinineLabCode || '155',
       searchCharset: config.schema?.searchCharset || 'tis620',
@@ -286,29 +310,33 @@ app.get('/api/setup/companion/devices', localSetupOnly, (req, res) => {
   const sessions = Array.from(companionSessions.values());
   const now = Date.now();
   const registered = companionDeviceRecords().map(device => {
-    const active = sessions.find(s => s.deviceId === device.id && s.active && (now - s.timestamp <= 25000));
+    const active = !device.revokedAt ? sessions.find(s => (s.deviceId === device.id || s.computer === device.name) && s.active && (now - s.timestamp <= 25000)) : null;
     return {
       id: device.id,
       name: device.name,
       createdAt: device.createdAt,
       revokedAt: device.revokedAt || null,
       isOnline: Boolean(active),
-      currentUser: active ? (active.user || '') : ''
+      currentUser: active ? (active.user || '') : '',
+      clientIp: active?.clientIp || device.clientIp || '',
+      localIp: active?.localIp || device.localIp || ''
     };
   });
 
   // Include any actively connected companion session not yet in the registered list
   for (const session of sessions) {
     if (session.active && (now - session.timestamp <= 25000)) {
-      const already = registered.some(d => d.id === session.deviceId || d.name === session.computer);
+      const already = registered.some(d => !d.revokedAt && (d.id === session.deviceId || d.name === session.computer));
       if (!already) {
         registered.unshift({
-          id: session.deviceId || `session-${session.computer || 'device'}`,
-          name: session.computer || 'Companion workstation',
+          id: session.deviceId || `session-${session.clientIp || 'device'}`,
+          name: session.computer || `Workstation ${session.localIp || session.clientIp}`,
           createdAt: new Date(session.timestamp).toISOString(),
           revokedAt: null,
           isOnline: true,
           currentUser: session.user || '',
+          clientIp: session.clientIp || '',
+          localIp: session.localIp || '',
           isLegacy: !session.deviceId || session.deviceId === 'legacy'
         });
       }
@@ -317,6 +345,23 @@ app.get('/api/setup/companion/devices', localSetupOnly, (req, res) => {
 
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.json({ success: true, devices: registered });
+});
+
+app.post('/api/setup/companion/devices/:id/delete', localSetupOnly, (req, res) => {
+  try {
+    const config = db.getConfig();
+    if (config?.security?.companionDevices) {
+      const initial = config.security.companionDevices.length;
+      config.security.companionDevices = config.security.companionDevices.filter(d => d.id !== req.params.id);
+      if (config.security.companionDevices.length !== initial) {
+        persistConfig(config);
+        audit.record({ requestId: req.requestId, action: 'COMPANION_DEVICE_DELETED', actor: 'local-setup', outcome: 'success' });
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'ลบรายการอุปกรณ์ไม่สำเร็จ' });
+  }
 });
 
 app.post('/api/install/ticket', (req, res) => {
@@ -389,8 +434,17 @@ app.post('/api/install/enroll', (req, res) => {
   attempts.count += 1;
   enrollmentAttempts.set(ip, attempts);
   const name = String(req.body?.deviceName || '').replace(/[\r\n\0]/g, ' ').trim().slice(0, 100) || 'HOSxP workstation';
+  const localIp = String(req.body?.localIp || '').trim().slice(0, 50);
   const token = crypto.randomBytes(32).toString('hex');
-  const device = { id: crypto.randomUUID(), name, tokenHash: crypto.createHash('sha256').update(token).digest('hex'), createdAt: new Date(now).toISOString(), revokedAt: null };
+  const device = {
+    id: crypto.randomUUID(),
+    name,
+    clientIp: ip,
+    localIp: localIp || ip,
+    tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+    createdAt: new Date(now).toISOString(),
+    revokedAt: null
+  };
   config.security = config.security || {};
   config.security.companionDevices = companionDeviceRecords(config);
   config.security.companionDevices.push(device);
@@ -469,7 +523,11 @@ app.post('/api/setup/save', localSetupOnly, async (req, res) => {
     if (!h.host || !h.database || !h.user) return res.status(400).json({ success: false, error: 'กรอกค่าฐานข้อมูล HOSxP ให้ครบ' });
     if (!h.password && old?.hosxp?.password) h.password = old.hosxp.password;
     const dbCheck = await db.testConnection(h);
-    const allow = String(body.allowedLanSubnets || '127.0.0.1,::1').split(',').map(item => item.trim()).filter(Boolean);
+    const parsedAllow = String(body.allowedLanSubnets || '127.0.0.1,::1')
+      .split(/[,;\s]+/)
+      .map(item => item.trim().replace(/^[;,]+|[;,]+$/g, ''))
+      .filter(Boolean);
+    const allow = Array.from(new Set(['127.0.0.1', '::1', ...parsedAllow]));
     const config = {
       port: Math.min(Math.max(Number(body.port) || 3030, 1), 65535),
       hospitalName: String(body.hospitalName || '').trim().slice(0, 120),
@@ -477,6 +535,8 @@ app.post('/api/setup/save', localSetupOnly, async (req, res) => {
       hosxp: { host: String(h.host).trim(), port: Number(h.port) || 3306, database: String(h.database).trim(), user: String(h.user).trim(), password: String(h.password || ''), connectionLimit: 10 },
       security: {
         allowedLanSubnets: allow,
+        allowInsecureEnrollment: body.allowInsecureEnrollment !== undefined ? Boolean(body.allowInsecureEnrollment) : true,
+        allowRemoteSetup: body.allowRemoteSetup !== undefined ? Boolean(body.allowRemoteSetup) : (old?.security?.allowRemoteSetup || false),
         apiKey: old?.security?.apiKey || '',
         companionToken: old?.security?.companionToken || crypto.randomBytes(32).toString('hex'),
         companionDevices: old?.security?.companionDevices || [],
@@ -577,22 +637,30 @@ app.set('requestIsSecure', requestIsSecure);
 app.set('productVersion', PRODUCT_VERSION);
 app.set('productBuild', PRODUCT_BUILD);
 app.set('companionToken', () => db.getConfig()?.security?.companionToken || '');
-app.set('authenticateCompanionToken', providedToken => {
-  if (!/^[a-f0-9]{64}$/i.test(String(providedToken || ''))) return { valid: false };
-  const normalized = String(providedToken).toLowerCase();
-  const provided = Buffer.from(normalized);
+app.set('authenticateCompanionToken', (providedToken, clientIp) => {
+  const normalized = String(providedToken || '').trim().toLowerCase();
   const config = db.getConfig() || {};
   const sharedToken = String(config.security?.companionToken || '').toLowerCase();
-  if (/^[a-f0-9]{64}$/.test(sharedToken)) {
+  if (/^[a-f0-9]{64}$/.test(sharedToken) && /^[a-f0-9]{64}$/.test(normalized)) {
+    const provided = Buffer.from(normalized);
     const expected = Buffer.from(sharedToken);
     if (provided.length === expected.length && crypto.timingSafeEqual(provided, expected)) return { valid: true, deviceId: '', deviceName: '' };
   }
-  const tokenHash = crypto.createHash('sha256').update(normalized).digest();
-  for (const device of companionDeviceRecords(config)) {
-    if (device.revokedAt || !/^[a-f0-9]{64}$/i.test(String(device.tokenHash || ''))) continue;
-    const expectedHash = Buffer.from(String(device.tokenHash).toLowerCase(), 'hex');
-    if (tokenHash.length === expectedHash.length && crypto.timingSafeEqual(tokenHash, expectedHash)) {
-      return { valid: true, deviceId: device.id, deviceName: device.name || '' };
+  if (/^[a-f0-9]{64}$/.test(normalized)) {
+    const tokenHash = crypto.createHash('sha256').update(normalized).digest();
+    for (const device of companionDeviceRecords(config)) {
+      if (device.revokedAt || !/^[a-f0-9]{64}$/i.test(String(device.tokenHash || ''))) continue;
+      const expectedHash = Buffer.from(String(device.tokenHash).toLowerCase(), 'hex');
+      if (tokenHash.length === expectedHash.length && crypto.timingSafeEqual(tokenHash, expectedHash)) {
+        return { valid: true, deviceId: device.id, deviceName: device.name || '' };
+      }
+    }
+  }
+  if (clientIp && config?.security?.allowInsecureEnrollment !== false) {
+    const rules = Array.isArray(config?.security?.allowedLanSubnets) ? config.security.allowedLanSubnets : [];
+    const isLanAllowed = rules.some(rule => rule && (rule.endsWith('.') ? clientIp.startsWith(rule) : clientIp === rule));
+    if (isLanAllowed) {
+      return { valid: true, deviceId: 'lan-' + clientIp, deviceName: 'Workstation ' + clientIp };
     }
   }
   return { valid: false };

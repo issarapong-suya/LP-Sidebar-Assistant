@@ -425,6 +425,10 @@
       link.style.pointerEvents = 'auto';
       link.setAttribute('aria-disabled', 'false');
 
+      const notice = el('notice');
+      notice.className = 'notice secure';
+      notice.textContent = '✓ การเชื่อมต่อพร้อมสำหรับการติดตั้ง: เครือข่าย LAN ได้รับอนุญาตเรียบร้อย';
+
       link.addEventListener('click', () => {
         link.textContent = '⏳ เริ่มดาวน์โหลดแล้ว... กรุณาเปิดไฟล์';
         startStatusPolling();

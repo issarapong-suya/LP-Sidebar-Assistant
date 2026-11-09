@@ -44,7 +44,7 @@ function setAssistantSessionActive(active, user = '', authMode = '') {
   document.body.classList.toggle('session-locked', locked);
   const overlay = document.getElementById('sessionLockOverlay');
   const message = document.getElementById('sessionLockMessage');
-  if (message) message.textContent = locked ? 'เข้าสู่ระบบด้วยบัญชี HOSxP ได้ แม้ไม่ได้เปิดโปรแกรม HOSxP' : (authMode === 'manual' ? `เข้าสู่ระบบแล้ว · ${user}` : `ตรวจพบ session HOSxP · ${user}`);
+  if (message) message.textContent = locked ? 'เข้าสู่ระบบด้วยบัญชี HOSxP' : (authMode === 'manual' ? `เข้าสู่ระบบแล้ว · ${user}` : `ตรวจพบ session HOSxP · ${user}`);
   const logoutButton = document.getElementById('btnSessionLogout');
   if (logoutButton) logoutButton.hidden = !(active && authMode === 'manual');
   if (locked) {

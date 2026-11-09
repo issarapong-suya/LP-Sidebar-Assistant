@@ -13,9 +13,12 @@
 <body>
   <section id="sessionLockOverlay" class="session-lock-overlay" aria-labelledby="loginTitle">
     <div class="session-lock-card">
-      <div class="session-lock-icon" aria-hidden="true">🔒</div>
-      <h1 id="loginTitle">เข้าสู่ระบบ Sidebar Doctor Assistant</h1>
-      <p id="sessionLockMessage">เข้าสู่ระบบด้วยบัญชี HOSxP ได้ แม้ไม่ได้เปิดโปรแกรม HOSxP</p>
+      <div class="session-lock-icon" aria-hidden="true">
+        <img src="/doctor-icon.png" alt="Doctor Assistant" class="login-doctor-logo">
+      </div>
+      <div class="login-brand-title">LP Sidebar Doctor Assistant</div>
+      <h1 id="loginTitle">เข้าสู่ระบบ</h1>
+      <p id="sessionLockMessage">เข้าสู่ระบบด้วยบัญชี HOSxP</p>
       <form id="hosxpLoginForm" class="hosxp-login-form" autocomplete="on">
         <label for="loginUsername">ชื่อผู้ใช้ HOSxP</label>
         <input id="loginUsername" name="username" type="text" maxlength="250" autocomplete="username" required>

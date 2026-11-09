@@ -163,7 +163,7 @@ router.post('/notify-patient', express.json({ limit: '32kb' }), (req, res) => {
   const body = req.body || {};
   const ip = clientIp(req);
   const providedToken = String(req.get('x-companion-token') || '');
-  const companionAuth = req.app.get('authenticateCompanionToken')(providedToken);
+  const companionAuth = req.app.get('authenticateCompanionToken')(providedToken, ip);
   if (!companionAuth.valid) {
     auditLog.record({ requestId: req.requestId, action: 'COMPANION_HEARTBEAT_REJECTED', clientIp: ip, outcome: 'denied' });
     return res.status(401).json({ success: false, error: 'Companion ไม่ได้รับอนุญาต' });
@@ -186,10 +186,18 @@ router.post('/notify-patient', express.json({ limit: '32kb' }), (req, res) => {
     liveDiag = String(previous.live_diag || '');
   }
 
+  const reportedComputer = String(body.computer || '').trim();
+  const localIp = String(body.ip || '').trim();
+  const computerName = reportedComputer || companionAuth.deviceName || ('Workstation ' + (localIp || ip));
+
   const state = {
     vn: newVn, hn: newHn, user: sessionActive ? String(body.user || '').slice(0, 100) : '',
     live_diag: liveDiag,
-    computer: String(companionAuth.deviceName || body.computer || '').slice(0, 100), device_id: companionAuth.deviceId || '', session_active: sessionActive,
+    computer: computerName.slice(0, 100),
+    device_id: companionAuth.deviceId || '',
+    client_ip: ip,
+    local_ip: localIp,
+    session_active: sessionActive,
     last_click_id: Number(body.click_id) || (isClick ? Date.now() : previous.last_click_id || 0),
     last_click_vn: isClick ? String(body.vn || '') : previous.last_click_vn || '',
     timestamp: Date.now()
@@ -197,8 +205,19 @@ router.post('/notify-patient', express.json({ limit: '32kb' }), (req, res) => {
   const sessionChanged = Boolean(previous.session_active) !== sessionActive || (sessionActive && previous.user !== state.user);
   activePatients.set(ip, state);
   const sessions = req.app.get('companionSessions');
-  if (sessionActive) sessions.set(ip, { active: true, user: state.user, computer: state.computer, deviceId: state.device_id, timestamp: state.timestamp });
-  else sessions.delete(ip);
+  if (sessionActive) {
+    sessions.set(ip, {
+      active: true,
+      user: state.user,
+      computer: state.computer,
+      deviceId: state.device_id,
+      clientIp: ip,
+      localIp: localIp,
+      timestamp: state.timestamp
+    });
+  } else {
+    sessions.delete(ip);
+  }
   if (ip === '127.0.0.1') activePatients.set('127.0.0.1', state);
   if (sessionChanged) auditLog.record({ requestId: req.requestId, action: sessionActive ? 'HOSXP_SESSION_STARTED' : 'HOSXP_SESSION_ENDED', actor: state.user || previous.user, workstation: state.computer, clientIp: ip, outcome: 'success' });
   if (patientChanged && (previous.vn || previous.hn || state.vn || state.hn)) auditLog.record({ requestId: req.requestId, action: state.vn || state.hn ? 'PATIENT_CONTEXT_SELECTED' : 'PATIENT_CONTEXT_CLEARED', actor: state.user || previous.user, workstation: state.computer || previous.computer, clientIp: ip, resourceType: state.vn || previous.vn ? 'visit' : 'patient', resourceRef: state.vn || previous.vn || state.hn || previous.hn, outcome: 'success' });
