@@ -346,10 +346,18 @@
 
       <!-- Action Button Area -->
       <div class="download-action" id="downloadArea">
-        <a class="btn-download" id="installLink" href="/install/companion.exe" download aria-disabled="true" style="opacity:.65;pointer-events:none">
+        <a class="btn-download" id="installLink" href="/install/companion.exe" download="DoctorAssistantCompanion.exe" aria-disabled="true" style="opacity:.65;pointer-events:none">
           กำลังเตรียมไฟล์ติดตั้ง...
         </a>
-        <span class="version-info" id="versionText">Sidebar Doctor Assistant · Companion</span>
+        <div style="margin-top:14px; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;">
+          <a id="configJsonLink" href="/install/config.json" download="config.json" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#0f766e; text-decoration:none; background:#f0fdfa; border:1px solid #99f6e4; padding:7px 14px; border-radius:8px; font-weight:600;">
+            📥 ดาวน์โหลดไฟล์ตั้งค่า config.json
+          </a>
+          <button type="button" id="btnCopyServerUrl" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#1e293b; background:#f8fafc; border:1px solid #cbd5e1; padding:7px 14px; border-radius:8px; cursor:pointer; font-weight:600;">
+            📋 คัดลอก Server URL (<span id="serverUrlDisplay" style="color:#0f766e;"></span>)
+          </button>
+        </div>
+        <span class="version-info" id="versionText" style="margin-top:12px;">Sidebar Doctor Assistant · Companion</span>
       </div>
 
       <!-- Steps Guide -->
@@ -364,8 +372,8 @@
         <div class="step">
           <span class="step-num">2</span>
           <div>
-            <strong>เปิดไฟล์ที่ดาวน์โหลดมาจากแถบดาวน์โหลดของเบราว์เซอร์</strong><br>
-            โปรแกรมจะคัดลอกตัวเองไปยัง <code>%LOCALAPPDATA%\SidebarDoctorAssistant</code> และสร้างไอคอนทางลัดบนหน้าจอ Desktop และ Startup ให้อัตโนมัติ
+            <strong>เปิดไฟล์ DoctorAssistantCompanion.exe ที่ดาวน์โหลดมา</strong><br>
+            โปรแกรมจะติดตั้งตัวเองและสร้างทางลัดไอคอนพี่หมอบนหน้าจอ Desktop ให้อัตโนมัติ (หากโปรแกรมถามหา Server URL สามารถกดปุ่ม <b>คัดลอก Server URL</b> ด้านบนไปวางได้ทันที)
           </div>
         </div>
         <div class="step">
@@ -400,6 +408,17 @@
     const el = id => document.getElementById(id);
     let checkInterval = null;
 
+    // 0. Setup Server URL display & copy button
+    if (el('serverUrlDisplay')) el('serverUrlDisplay').textContent = window.location.origin;
+    if (el('btnCopyServerUrl')) {
+      el('btnCopyServerUrl').addEventListener('click', () => {
+        navigator.clipboard.writeText(window.location.origin);
+        const orig = el('btnCopyServerUrl').innerHTML;
+        el('btnCopyServerUrl').innerHTML = '✅ คัดลอกแล้ว!';
+        setTimeout(() => el('btnCopyServerUrl').innerHTML = orig, 2000);
+      });
+    }
+
     // 1. Fetch server & companion version
     fetch('/api/version', { cache: 'no-store' })
       .then(r => r.json())
@@ -424,6 +443,10 @@
       link.style.opacity = '1';
       link.style.pointerEvents = 'auto';
       link.setAttribute('aria-disabled', 'false');
+
+      if (el('configJsonLink')) {
+        el('configJsonLink').href = `/install/config.json?ticket=${encodeURIComponent(data.ticket)}`;
+      }
 
       const notice = el('notice');
       notice.className = 'notice secure';
