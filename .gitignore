@@ -6,15 +6,24 @@ server/data/*.jsonl
 server/data/*.sqlite*
 server/npm-debug.log*
 
-# Workstation configuration and generated builds
+# Workstation companion source code & internal build files (Approach B: Distribute compiled EXE only)
+companion/*.py
+companion/*.spec
+companion/*.bat
+companion/*.txt
+companion/*.ico
+companion/*.png
 companion/config.json
+companion/config.example.json
 companion/build/
-companion/dist/*
-!companion/dist/config.json
-!companion/dist/DoctorAssistantCompanion_v1_build20261109.01.exe
 companion/__pycache__/
 companion/*.log
 companion/*.exe
+
+# Only distribute the compiled companion release
+companion/dist/*
+!companion/dist/config.json
+!companion/dist/DoctorAssistantCompanion_v1_build20261109.01.exe
 
 # Python local environments
 **/.venv/
