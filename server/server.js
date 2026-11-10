@@ -97,11 +97,28 @@ function clearManualSession(req, res) {
   return session;
 }
 
+function ipMatchesRule(ip, rule) {
+  if (!ip || !rule) return false;
+  const cleanRule = String(rule).trim();
+  if (!cleanRule) return false;
+  if (cleanRule === ip) return true;
+  // If rule has dot at end, e.g. "172.16." or "192.168.100."
+  if (cleanRule.endsWith('.') && ip.startsWith(cleanRule)) return true;
+  // If rule has no dot at end, e.g. "172.16.0" or "192.168.100" or "172.16"
+  if (!cleanRule.endsWith('.') && ip.startsWith(cleanRule + '.')) return true;
+  // If CIDR notation e.g. "172.16.0.0/24"
+  if (cleanRule.includes('/')) {
+    const base = cleanRule.split('/')[0].replace(/\.0+$/, '');
+    if (ip.startsWith(base + '.')) return true;
+  }
+  return false;
+}
+
 function isAllowed(req, config) {
   const ip = requestClientIp(req);
   const security = config?.security || {};
   const rules = Array.isArray(security.allowedLanSubnets) ? security.allowedLanSubnets : [];
-  if (rules.some(rule => rule && (rule.endsWith('.') ? ip.startsWith(rule) : ip === rule))) return true;
+  if (rules.some(rule => ipMatchesRule(ip, rule))) return true;
   const key = security.apiKey;
   return Boolean(key && req.get('x-api-key') === key);
 }
@@ -572,7 +589,12 @@ app.post('/api/setup/save', localSetupOnly, async (req, res) => {
     const parsedAllow = String(body.allowedLanSubnets || '127.0.0.1,::1')
       .split(/[,;\s]+/)
       .map(item => item.trim().replace(/^[;,]+|[;,]+$/g, ''))
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(item => {
+        // หากผู้ใช้กรอก subnet เช่น 172.16.0 หรือ 192.168.100 หรือ 172.16 โดยไม่มีจุดลงท้าย ให้เติมจุดให้อัตโนมัติ
+        if (/^\d{1,3}(\.\d{1,3}){1,2}$/.test(item)) return `${item}.`;
+        return item;
+      });
     const allow = Array.from(new Set(['127.0.0.1', '::1', ...parsedAllow]));
     const config = {
       port: Math.min(Math.max(Number(body.port) || 3030, 1), 65535),
@@ -617,7 +639,32 @@ app.get('/setup', localSetupOnly, (req, res) => res.sendFile(path.join(PUBLIC, '
 function installNetworkOnly(req, res, next) {
   const config = db.getConfig();
   if (!config) return res.status(503).send('Server ยังไม่ได้ตั้งค่า');
-  if (!isAllowed(req, config)) return res.status(403).send('เครือข่ายนี้ไม่ได้รับอนุญาต');
+  if (!isAllowed(req, config)) {
+    const clientIp = requestClientIp(req);
+    const rules = Array.isArray(config?.security?.allowedLanSubnets) ? config.security.allowedLanSubnets.join(', ') : 'ไม่มี';
+    if (req.accepts('html')) {
+      return res.status(403).send(`
+        <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>เครือข่ายนี้ไม่ได้รับอนุญาต</title>
+        <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;}
+        .card{max-width:540px;margin:20px;background:#fff;padding:32px;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.08);text-align:center;}
+        h2{color:#0f2738;margin-top:0;}p{color:#64748b;line-height:1.6;font-size:14.5px;}
+        .ip-box{background:#f1f5f9;border:1px solid #cbd5e1;padding:12px;border-radius:8px;margin:16px 0;font-size:16px;color:#0f766e;font-weight:700;}
+        .rules-box{background:#fefce8;border:1px solid #fef08a;padding:10px;border-radius:8px;font-size:13px;color:#854d0e;word-break:break-all;}
+        </style></head><body><div class="card">
+        <h2>🚫 เครือข่ายนี้ไม่ได้รับอนุญาต</h2>
+        <p>เซิร์ฟเวอร์ตรวจพบว่าเครื่องของคุณเชื่อมต่อมาจาก IP:</p>
+        <div class="ip-box">${clientIp}</div>
+        <p>วงเครือข่ายที่อนุญาตในระบบขณะนี้:</p>
+        <div class="rules-box">${rules}</div>
+        <p style="margin-top:16px;font-size:13px;color:#64748b;">
+          หากต้องการให้เครื่องนี้เปิดใช้งานได้ ให้แอดมินเปิดหน้า Setup เพื่อเพิ่มวง <b>${clientIp.split('.').slice(0, 3).join('.')}.</b> (หรือ IP ด้านบน) ลงในช่อง "วงเครือข่ายที่อนุญาต" แล้วกดบันทึก
+        </p>
+        </div></body></html>
+      `);
+    }
+    return res.status(403).send(`เครือข่ายนี้ไม่ได้รับอนุญาต (IP เครื่องของคุณที่เซิร์ฟเวอร์ตรวจพบคือ: ${clientIp})`);
+  }
   return next();
 }
 
