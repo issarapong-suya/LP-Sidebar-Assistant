@@ -296,7 +296,11 @@ el('btnAutoDetectLabs').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<span class="btn-icon">◌</span>กำลังค้นหาจาก lab_items...';
   try {
-    const res = await fetch('/api/setup/auto-detect-labs');
+    const res = await fetch('/api/setup/auto-detect-labs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form())
+    });
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error(data.error || 'ตรวจจับไม่สำเร็จ');
     const d = data.detected;

@@ -37,6 +37,15 @@ function cleanIp(value) {
   return ip === '::1' ? '127.0.0.1' : ip;
 }
 
+function isPrivateIp(value) {
+  if (!value) return false;
+  const ip = cleanIp(value);
+  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') return true;
+  if (ip.startsWith('10.') || ip.startsWith('192.168.')) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true;
+  return false;
+}
+
 function isLocal(req) {
   const ip = cleanIp(req.socket?.remoteAddress || req.ip);
   return ip === '127.0.0.1' || ip === 'localhost';
@@ -106,8 +115,9 @@ function localSetupOnly(req, res, next) {
   // 2. แอดมินสั่ง override ด้วย Environment Variable (เช่น ALLOW_REMOTE_SETUP=true ใน systemd service หรือคำสั่งรัน)
   if (process.env.ALLOW_REMOTE_SETUP === 'true') return next();
 
-  // 3. เซิร์ฟเวอร์ตั้งค่าแล้ว: ตรวจสอบว่าเปิด allowRemoteSetup หรือไม่ และ Client IP อยู่ในวงเครือข่ายที่อนุญาต
-  if (config?.security?.allowRemoteSetup === true && isAllowed(req, config)) {
+  // 3. เซิร์ฟเวอร์ตั้งค่าแล้ว: ตรวจสอบว่าเปิด allowRemoteSetup หรือไม่
+  // อนุญาตถ้า IP อยู่ใน allowedLanSubnets หรือเป็น Private LAN IP (ป้องกันกรณีแอดมินพิมพ์ subnet ผิดพลาดขณะตั้งค่าแล้วล็อกตัวเองออก)
+  if (config?.security?.allowRemoteSetup === true && (isAllowed(req, config) || isPrivateIp(requestClientIp(req)))) {
     return next();
   }
   if (req.accepts('html') && !req.path.startsWith('/api/')) {
@@ -173,10 +183,31 @@ function companionDeviceRecords(config = db.getConfig()) {
 app.get('/health', (req, res) => res.json({ status: 'ok', configured: !!db.getConfig(), productVersion: PRODUCT_VERSION, build: PRODUCT_BUILD, time: new Date().toISOString() }));
 app.get('/api/version', (req, res) => res.json({ product: 'Sidebar Doctor Assistant', version: PRODUCT_VERSION, build: PRODUCT_BUILD }));
 
-app.get('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
+app.all('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
+  let tempConn = null;
   try {
-    const pool = db.getPool();
-    const [items] = await pool.execute('SELECT lab_items_code, lab_items_name, lab_items_unit, lab_items_normal_value FROM lab_items WHERE lab_items_name IS NOT NULL AND lab_items_name != ""');
+    let items = [];
+    const h = req.body?.hosxp;
+    if (h?.host && h?.database && h?.user) {
+      const mysql = require('mysql2/promise');
+      const previous = db.getConfig();
+      const password = h.password || previous?.hosxp?.password || '';
+      tempConn = await mysql.createConnection({
+        host: String(h.host).trim(),
+        port: Number(h.port) || 3306,
+        database: String(h.database).trim(),
+        user: String(h.user).trim(),
+        password,
+        connectTimeout: 7000,
+        charset: 'utf8mb4'
+      });
+      const [rows] = await tempConn.execute('SELECT lab_items_code, lab_items_name, lab_items_unit, lab_items_normal_value FROM lab_items WHERE lab_items_name IS NOT NULL AND lab_items_name != ""');
+      items = rows;
+    } else {
+      const pool = db.getPool();
+      const [rows] = await pool.execute('SELECT lab_items_code, lab_items_name, lab_items_unit, lab_items_normal_value FROM lab_items WHERE lab_items_name IS NOT NULL AND lab_items_name != ""');
+      items = rows;
+    }
     
     const detected = {
       creatinine: [],
@@ -287,6 +318,10 @@ app.get('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
   } catch (error) {
     console.error('[setup] auto-detect-labs error:', error);
     res.status(500).json({ success: false, error: 'ไม่สามารถตรวจจับรหัสแล็ปได้: ' + (error.message || error) });
+  } finally {
+    if (tempConn) {
+      try { await tempConn.end(); } catch (_) {}
+    }
   }
 });
 
