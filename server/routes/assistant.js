@@ -85,9 +85,16 @@ router.post('/auth/login', async (req, res) => {
     auditLog.record({ requestId: req.requestId, action: 'HOSXP_MANUAL_LOGIN_RATE_LIMITED', clientIp: ip, outcome: 'denied' });
     return res.status(429).json({ success: false, error: 'ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่' });
   }
-  if (!req.app.get('requestIsSecure')(req) && ip !== '127.0.0.1') {
+
+  const config = getConfig();
+  const allowInsecure = config?.security?.allowInsecureEnrollment !== false;
+  const isLocalClient = ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+  const isSecure = typeof req.app.get('requestIsSecure') === 'function' ? req.app.get('requestIsSecure')(req) : false;
+
+  if (!allowInsecure && !isSecure && !isLocalClient) {
     return res.status(426).json({ success: false, error: 'การเข้าสู่ระบบจากเครื่องอื่นต้องใช้ HTTPS เพื่อปกป้องรหัสผ่าน' });
   }
+
   const username = String(req.body?.username || '').trim();
   const password = String(req.body?.password || '');
   if (!username || !password || username.length > 250 || password.length > 250) {
@@ -96,10 +103,17 @@ router.post('/auth/login', async (req, res) => {
 
   try {
     const db = getPool();
-    // The site's passweb sample is 32 hex characters, and MD5 is used by some HOSxP-related web integrations.
-    // Compare inside MariaDB with a prepared parameter; never select or return the stored hash.
-    const [rows] = await db.execute(`SELECT loginname,name,account_disable FROM opduser
-      WHERE loginname=? AND passweb IS NOT NULL AND LOWER(passweb)=LOWER(MD5(?)) LIMIT 1`, [username, password]);
+    // ตรวจสอบทั้ง passweb (MD5), password (MD5), และ password (plain text) รองรับทุกเวอร์ชันของ HOSxP
+    const [rows] = await db.execute(`
+      SELECT loginname, name, account_disable 
+      FROM opduser 
+      WHERE LOWER(loginname) = LOWER(?) 
+        AND (
+          (passweb IS NOT NULL AND passweb != '' AND LOWER(passweb) = LOWER(MD5(?)))
+          OR (password IS NOT NULL AND password != '' AND (LOWER(password) = LOWER(MD5(?)) OR password = ?))
+        )
+      LIMIT 1
+    `, [username, password, password, password]);
     const account = rows[0];
     const disabled = account && ['Y', '1'].includes(String(account.account_disable || '').trim().toUpperCase());
     if (!account || disabled) {

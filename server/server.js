@@ -401,12 +401,12 @@ app.post('/api/setup/auth/login', async (req, res) => {
     const [rows] = await pool.execute(`
       SELECT loginname, name, account_disable, groupname, accessright
       FROM opduser
-      WHERE loginname = ? AND (
-        (passweb IS NOT NULL AND LOWER(passweb) = LOWER(MD5(?))) OR
-        (password IS NOT NULL AND LOWER(password) = LOWER(MD5(?)))
+      WHERE LOWER(loginname) = LOWER(?) AND (
+        (passweb IS NOT NULL AND passweb != '' AND LOWER(passweb) = LOWER(MD5(?))) OR
+        (password IS NOT NULL AND password != '' AND (LOWER(password) = LOWER(MD5(?)) OR password = ?))
       )
       LIMIT 1
-    `, [username, password, password]);
+    `, [username, password, password, password]);
 
     const user = rows[0];
     const disabled = user && ['Y', '1'].includes(String(user.account_disable || '').trim().toUpperCase());
