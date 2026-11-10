@@ -107,17 +107,19 @@ function isAllowed(req, config) {
 }
 
 function localSetupOnly(req, res, next) {
+  // 1. เข้าใช้งานจาก localhost บนเซิร์ฟเวอร์โดยตรง หรือผ่าน SSH Tunnel
   if (isLocal(req) && !req.get('x-forwarded-for')) return next();
-  const config = db.getConfig();
-  // 1. ติดตั้งใหม่บนเซิร์ฟเวอร์ (ยังไม่มี config.json): อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN เพื่อเริ่มตั้งค่าได้ทันที
-  if (!config) return next();
 
-  // 2. แอดมินสั่ง override ด้วย Environment Variable (เช่น ALLOW_REMOTE_SETUP=true ใน systemd service หรือคำสั่งรัน)
+  // 2. แอดมินสั่ง override ด้วย Environment Variable (เช่น ALLOW_REMOTE_SETUP=true ใน systemd service)
   if (process.env.ALLOW_REMOTE_SETUP === 'true') return next();
 
-  // 3. เซิร์ฟเวอร์ตั้งค่าแล้ว: ตรวจสอบว่าเปิด allowRemoteSetup หรือไม่
-  // อนุญาตถ้า IP อยู่ใน allowedLanSubnets หรือเป็น Private LAN IP (ป้องกันกรณีแอดมินพิมพ์ subnet ผิดพลาดขณะตั้งค่าแล้วล็อกตัวเองออก)
-  if (config?.security?.allowRemoteSetup === true && (isAllowed(req, config) || isPrivateIp(requestClientIp(req)))) {
+  const config = db.getConfig();
+  // 3. ติดตั้งใหม่บนเซิร์ฟเวอร์ (ยังไม่มี config.json): อนุญาตให้เข้าหน้า Setup เพื่อเริ่มตั้งค่าได้ทันที
+  if (!config) return next();
+
+  // 4. มีการเปิดตัวเลือก allowRemoteSetup ไว้ (ค่าเริ่มต้นคือเปิด): อนุญาตให้แอดมินจัดการหน้า Setup ได้อย่างราบรื่น
+  // ไม่นำ filter ของ allowedLanSubnets มาบล็อก เพื่อป้องกันแอดมินล็อกตัวเองออกหากพิมพ์คอมม่าตกหรือ IP ผ่าน NAT
+  if (config?.security?.allowRemoteSetup !== false) {
     return next();
   }
   if (req.accepts('html') && !req.path.startsWith('/api/')) {

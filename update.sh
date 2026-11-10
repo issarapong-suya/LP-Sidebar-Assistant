@@ -31,7 +31,14 @@ if id "$SERVICE_USER" >/dev/null 2>&1; then
   chmod 775 "$SERVER_DIR" || true
 fi
 
-echo -e "\n${BLUE}[3/3] รีสตาร์ต Service...${NC}"
+echo -e "\n${BLUE}[3/3] ตรวจสอบ Service และรีสตาร์ต...${NC}"
+SERVICE_FILE="/etc/systemd/system/doctor-assistant.service"
+if [ -f "$SERVICE_FILE" ]; then
+  if ! grep -q "ALLOW_REMOTE_SETUP" "$SERVICE_FILE"; then
+    sudo sed -i '/\[Service\]/a Environment=ALLOW_REMOTE_SETUP=true' "$SERVICE_FILE" || true
+    sudo systemctl daemon-reload || true
+  fi
+fi
 if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet doctor-assistant.service; then
   sudo systemctl restart doctor-assistant.service
   echo -e "${GREEN}✓ รีสตาร์ต doctor-assistant.service เรียบร้อยแล้ว${NC}"
