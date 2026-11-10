@@ -842,25 +842,7 @@ app.get('/install/companion.exe', installNetworkOnly, (req, res) => {
   const release = getLatestCompanionRelease();
   if (!release || !fs.existsSync(release.fullPath)) return res.status(404).send('ยังไม่มีไฟล์ Companion สำหรับรุ่นนี้');
   res.set('Cache-Control', 'no-store');
-  res.download(release.fullPath, 'DoctorAssistantCompanion.exe');
-});
-
-app.get('/install/config.json', installNetworkOnly, (req, res) => {
-  const scheme = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-  const host = req.get('host') || `${req.socket.localAddress}:${httpServer?.address()?.port || 3030}`;
-  const serverUrl = `${scheme}://${host}`;
-  const ticket = String(req.query.ticket || '').trim();
-  const cfg = {
-    server_url: serverUrl,
-    auto_view: true,
-    open_new_tab: false,
-    always_on_top: true,
-    app_mode: true
-  };
-  if (ticket) cfg.install_ticket = ticket;
-  res.set('Content-Disposition', 'attachment; filename="config.json"');
-  res.set('Content-Type', 'application/json; charset=utf-8');
-  res.send(JSON.stringify(cfg, null, 2));
+  res.download(release.fullPath, release.name);
 });
 
 app.use('/install', installNetworkOnly, express.static(path.join(PUBLIC, 'install')));

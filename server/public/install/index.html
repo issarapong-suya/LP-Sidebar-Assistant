@@ -346,15 +346,14 @@
 
       <!-- Action Button Area -->
       <div class="download-action" id="downloadArea">
-        <a class="btn-download" id="installLink" href="/install/companion.exe" download="DoctorAssistantCompanion.exe" aria-disabled="true" style="opacity:.65;pointer-events:none">
+        <a class="btn-download" id="installLink" href="/install/companion.exe" download aria-disabled="true" style="opacity:.65;pointer-events:none">
           กำลังเตรียมไฟล์ติดตั้ง...
         </a>
-        <div style="margin-top:14px; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;">
-          <a id="configJsonLink" href="/install/config.json" download="config.json" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#0f766e; text-decoration:none; background:#f0fdfa; border:1px solid #99f6e4; padding:7px 14px; border-radius:8px; font-weight:600;">
-            📥 ดาวน์โหลดไฟล์ตั้งค่า config.json
-          </a>
-          <button type="button" id="btnCopyServerUrl" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#1e293b; background:#f8fafc; border:1px solid #cbd5e1; padding:7px 14px; border-radius:8px; cursor:pointer; font-weight:600;">
-            📋 คัดลอก Server URL (<span id="serverUrlDisplay" style="color:#0f766e;"></span>)
+        <div style="margin-top:16px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:13.5px; color:#475569; font-weight:600;">Server URL:</span>
+          <input type="text" id="serverUrlInput" readonly style="font-family:Consolas,monospace; font-size:14px; font-weight:700; color:#0f766e; background:#f0fdfa; border:1px solid #99f6e4; padding:7px 12px; border-radius:8px; width:260px; text-align:center; cursor:pointer;" title="คลิกเพื่อเลือกทั้งหมด">
+          <button type="button" id="btnCopyServerUrl" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:#fff; background:#0f766e; border:none; padding:7px 16px; border-radius:8px; cursor:pointer; font-weight:700;">
+            📋 คัดลอก URL
           </button>
         </div>
         <span class="version-info" id="versionText" style="margin-top:12px;">Sidebar Doctor Assistant · Companion</span>
@@ -372,8 +371,8 @@
         <div class="step">
           <span class="step-num">2</span>
           <div>
-            <strong>เปิดไฟล์ DoctorAssistantCompanion.exe ที่ดาวน์โหลดมา</strong><br>
-            โปรแกรมจะติดตั้งตัวเองและสร้างทางลัดไอคอนพี่หมอบนหน้าจอ Desktop ให้อัตโนมัติ (หากโปรแกรมถามหา Server URL สามารถกดปุ่ม <b>คัดลอก Server URL</b> ด้านบนไปวางได้ทันที)
+            <strong>เปิดไฟล์โปรแกรม Companion ที่ดาวน์โหลดมา</strong><br>
+            โปรแกรมจะติดตั้งตัวเองและสร้างทางลัดไอคอนพี่หมอบนหน้าจอ Desktop ให้อัตโนมัติ (หากโปรแกรมถามหา Server URL สามารถกดปุ่ม <b>คัดลอก URL</b> ด้านบนไปวางได้ทันที)
           </div>
         </div>
         <div class="step">
@@ -408,15 +407,76 @@
     const el = id => document.getElementById(id);
     let checkInterval = null;
 
-    // 0. Setup Server URL display & copy button
-    if (el('serverUrlDisplay')) el('serverUrlDisplay').textContent = window.location.origin;
-    if (el('btnCopyServerUrl')) {
-      el('btnCopyServerUrl').addEventListener('click', () => {
-        navigator.clipboard.writeText(window.location.origin);
-        const orig = el('btnCopyServerUrl').innerHTML;
-        el('btnCopyServerUrl').innerHTML = '✅ คัดลอกแล้ว!';
-        setTimeout(() => el('btnCopyServerUrl').innerHTML = orig, 2000);
-      });
+    // 0. Setup Server URL display & copy button with HTTP fallback
+    const sInput = el('serverUrlInput');
+    if (sInput) {
+      sInput.value = window.location.origin;
+      sInput.addEventListener('click', () => sInput.select());
+    }
+
+    function copyServerUrl() {
+      const url = window.location.origin;
+      if (sInput) {
+        sInput.value = url;
+        sInput.select();
+        sInput.setSelectionRange(0, 99999);
+      }
+      
+      const btn = el('btnCopyServerUrl');
+      const setSuccess = () => {
+        btn.innerHTML = '✅ คัดลอกแล้ว!';
+        btn.style.background = '#15803d';
+        setTimeout(() => {
+          btn.innerHTML = '📋 คัดลอก URL';
+          btn.style.background = '#0f766e';
+        }, 2000);
+      };
+
+      // 1. ลองใช้ Modern Clipboard API ก่อน (กรณี HTTPS หรือ Localhost)
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url).then(setSuccess).catch(fallback);
+        return;
+      }
+      fallback();
+
+      // 2. สำรองสำหรับ HTTP ธรรมดาในวง LAN (execCommand copy)
+      function fallback() {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.style.position = 'fixed';
+          ta.style.top = '0';
+          ta.style.left = '0';
+          ta.style.width = '2em';
+          ta.style.height = '2em';
+          ta.style.padding = '0';
+          ta.style.border = 'none';
+          ta.style.outline = 'none';
+          ta.style.boxShadow = 'none';
+          ta.style.background = 'transparent';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) {
+            setSuccess();
+            return;
+          }
+        } catch (_) {}
+
+        // หากทุกวิธีไม่ได้ ให้เลือกข้อความใน input ให้ผู้ใช้กด Ctrl+C ได้เลย
+        if (sInput) sInput.select();
+        btn.textContent = 'กด Ctrl+C เพื่อคัดลอก';
+        setTimeout(() => {
+          btn.innerHTML = '📋 คัดลอก URL';
+        }, 2500);
+      }
+    }
+
+    const copyBtn = el('btnCopyServerUrl');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', copyServerUrl);
     }
 
     // 1. Fetch server & companion version
@@ -443,10 +503,6 @@
       link.style.opacity = '1';
       link.style.pointerEvents = 'auto';
       link.setAttribute('aria-disabled', 'false');
-
-      if (el('configJsonLink')) {
-        el('configJsonLink').href = `/install/config.json?ticket=${encodeURIComponent(data.ticket)}`;
-      }
 
       const notice = el('notice');
       notice.className = 'notice secure';
