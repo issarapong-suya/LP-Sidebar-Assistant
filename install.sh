@@ -123,6 +123,7 @@ Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 Environment=PORT=$APP_PORT
+Environment=ALLOW_REMOTE_SETUP=true
 LimitNOFILE=65536
 
 # Security hardening
@@ -168,16 +169,9 @@ echo -e "${GREEN}===============================================================
 echo -e "พอร์ตบริการที่ใช้งาน: ${BOLD}$APP_PORT${NC}"
 echo -e "ขั้นตอนต่อไปสำหรับผู้ดูแลระบบ IT:"
 echo -e "1. ${BOLD}เปิดหน้า Setup เพื่อตั้งค่าเชื่อมต่อฐานข้อมูล HOSxP:${NC}"
-echo -e "   👉 ${YELLOW}http://$SERVER_IP:$APP_PORT/setup/${NC} (หรือ http://localhost:$APP_PORT/setup/)"
+echo -e "   👉 ${YELLOW}http://$SERVER_IP:$APP_PORT/setup/${NC} (เข้าได้จากคอมพิวเตอร์ในวง LAN ทันที)"
 echo -e "2. ${BOLD}หน้าดาวน์โหลดโปรแกรมสำหรับโต๊ะตรวจแพทย์:${NC}"
 echo -e "   👉 ${YELLOW}http://$SERVER_IP:$APP_PORT/install/${NC}"
-echo -e "3. ${BOLD}คำสั่งจัดการ Service:${NC}"
-echo -e "   - ตรวจสอบสถานะ : ${YELLOW}sudo systemctl status doctor-assistant${NC}"
-echo -e "   - ดู Log การทำงาน : ${YELLOW}sudo journalctl -u doctor-assistant -f${NC}"
-echo -e "   - รีสตาร์ตระบบ   : ${YELLOW}sudo systemctl restart doctor-assistant${NC}"
-echo -e "   - อัปเดตเวอร์ชันใหม่: ${YELLOW}sudo bash $APP_DIR/update.sh${NC}"
-echo -e "${GREEN}==================================================================${NC}\n"
-echo -e "   👉 ${YELLOW}http://$SERVER_IP:3030/install/${NC}"
 echo -e "3. ${BOLD}คำสั่งจัดการ Service:${NC}"
 echo -e "   - ตรวจสอบสถานะ : ${YELLOW}sudo systemctl status doctor-assistant${NC}"
 echo -e "   - ดู Log การทำงาน : ${YELLOW}sudo journalctl -u doctor-assistant -f${NC}"

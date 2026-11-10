@@ -168,7 +168,7 @@
             <div class="section-label" style="margin-top:25px">Server access</div>
             <div class="form-grid">
               <div class="field"><label for="serverPort">พอร์ตบริการ</label><input id="serverPort" type="number" min="1" max="65535" value="3030"><div class="field-help">หากเปลี่ยนพอร์ต ระบบจะเริ่มบริการใหม่หลังบันทึก</div></div>
-              <div class="field"><label for="allowedLanSubnets">วงเครือข่ายที่อนุญาต</label><input id="allowedLanSubnets" value="127.0.0.1,::1,192.168.1." placeholder="127.0.0.1,::1,10.10.20."><div class="field-help">คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 10.10.20.</div></div>
+              <div class="field"><label for="allowedLanSubnets">วงเครือข่ายที่อนุญาต</label><input id="allowedLanSubnets" value="127.0.0.1,::1,192.168.1." placeholder="127.0.0.1,::1,10.10.20."><div class="field-help" id="allowedSubnetsHelp">คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 10.10.20. หรือ 192.168.</div></div>
               <div class="field full" style="margin-top:8px">
                 <label style="display:flex; align-items:center; gap:9px; cursor:pointer; font-weight:650; color:#0f2738;">
                   <input type="checkbox" id="allowInsecureEnrollment" checked style="width:18px; height:18px; cursor:pointer; accent-color:#0f766e;">
@@ -184,7 +184,7 @@
                 <div class="field-help" style="margin-top:4px;">เปิดให้ผู้ดูแลระบบสามารถเปิดหน้า http://&lt;IP_SERVER&gt;:3030/setup จากเครื่องคอมพิวเตอร์ในวง LAN ที่อนุญาตได้โดยไม่ต้องล็อกอินเปิดบราวเซอร์ที่หน้าเครื่องเซิร์ฟเวอร์</div>
               </div>
             </div>
-            <div class="info-box warn" style="margin-top:22px"><span class="info-icon">⚑</span><div>หน้า Setup จำกัดให้เปิดจากเครื่อง Server เท่านั้น การตรวจ role Admin/IT ของ HOSxP ต้องเชื่อมกับแหล่งสิทธิ์ของโรงพยาบาลก่อนใช้งานจริง</div></div>
+            <div class="info-box" style="margin-top:22px; background:#f0fdfa; border:1px solid #99f6e4;"><span class="info-icon" style="color:#0f766e;">💡</span><div style="color:#115e59;"><b>สิทธิ์การเข้าถึงหน้า Setup:</b> ตัวเลือก "อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN" เปิดไว้ตามค่าเริ่มต้นเพื่อความสะดวกในการจัดการบนเซิร์ฟเวอร์แบบไม่มีหน้าจอ (Headless Server) โดยระบบจะจำกัดให้เฉพาะเครื่องในวงเครือข่ายที่ระบุเท่านั้นที่เข้าได้</div></div>
             <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><button type="button" class="btn btn-quick-save" data-quick-save><span class="btn-icon">💾</span>บันทึกหน้านี้</button><button type="button" class="btn btn-primary" data-next>ถัดไป <span class="btn-icon">→</span></button></div></div>
           </div>
         </div>
@@ -229,7 +229,7 @@
             <div class="section-label">Configuration overview</div>
             <div class="summary-grid"><div class="summary-card"><small>ฐานข้อมูล</small><b id="summaryDatabase">ยังไม่ระบุ</b></div><div class="summary-card"><small>โรงพยาบาล</small><b id="summaryHospital">ยังไม่ระบุ</b></div><div class="summary-card"><small>ผลตรวจสิทธิ์</small><b><span class="pill">SELECT-only ผ่าน</span></b></div></div>
             <div class="info-box"><span class="info-icon">🔐</span><div>รหัสผ่านฐานข้อมูลจะอยู่บน Server เท่านั้น หลังบันทึก ดาวน์โหลด Companion จากหน้า Install บน workstation ได้โดยตรง</div></div>
-            <div class="info-box warn" style="margin-top:13px"><span class="info-icon">ⓘ</span><div>ก่อนใช้งานจริง โปรดให้ผู้ดูแลระบบ/DPO ของโรงพยาบาลกำหนดผู้มีสิทธิ์ Setup, HTTPS, อายุเก็บ log และตรวจทานนโยบายข้อมูลผู้ป่วย</div></div>
+            <div class="info-box warn" style="margin-top:13px"><span class="info-icon">🛡️</span><div><b>คำแนะนำความปลอดภัย:</b> ระบบเปิดให้เข้าหน้า Setup และจัดการ Companion จากเครื่องแอดมินในวงเครือข่ายที่อนุญาตได้ หากตั้งค่าทุกอย่างเรียบร้อยและต้องการจำกัดความปลอดภัยสูงสุด สามารถเลือกปิด "อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN" ในขั้นตอนที่ 2 ได้ทุกเมื่อ</div></div>
             <div class="info-box companion-box" id="companionProvision" hidden style="margin-top:13px"></div>
             <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><span class="inline-status" id="saveHint">ฐานข้อมูลผ่านการทดสอบแล้ว</span><button type="button" class="btn btn-primary" id="saveButton"><span class="btn-icon">✓</span>บันทึกและเริ่มระบบ</button></div></div>
           </div>
@@ -328,14 +328,28 @@ el('btnAutoDetectLabs').addEventListener('click', async () => {
     btn.innerHTML = '🪄 ค้นหาและจับคู่รหัส Lab อัตโนมัติ';
   }
 });
-fetch('/api/setup/status').then(response=>response.json()).then(({config})=>{
+fetch('/api/setup/status').then(response=>response.json()).then(data=>{
+  const { config, clientIp } = data || {};
+  if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== 'localhost') {
+    const helpBox = el('allowedSubnetsHelp');
+    if (helpBox) helpBox.innerHTML = `ตรวจพบ IP เครื่องของคุณขณะนี้: <b style="color:#0f766e;">${clientIp}</b> (คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 192.168. หรือ 172.16.)`;
+    const parts = clientIp.split('.');
+    if (parts.length === 4) {
+      const suggestedSubnet = `${parts[0]}.${parts[1]}.${parts[2]}.`;
+      const current = el('allowedLanSubnets').value.split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean);
+      if (!current.includes(suggestedSubnet)) {
+        current.push(suggestedSubnet);
+        el('allowedLanSubnets').value = current.join(',');
+      }
+    }
+  }
   if(!config)return;
   el('hospitalName').value=config.hospitalName||'';
   el('hospitalCode').value=config.hospitalCode||'';
   el('serverPort').value=config.port||3030;
   el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||['127.0.0.1','::1']).join(',');
   el('allowInsecureEnrollment').checked=config.security?.allowInsecureEnrollment!==false;
-  el('allowRemoteSetup').checked=config.security?.allowRemoteSetup===true;
+  el('allowRemoteSetup').checked=config.security?.allowRemoteSetup!==false;
   el('dbHost').value=config.hosxp?.host||'';
   el('dbPort').value=config.hosxp?.port||3306;
   el('dbName').value=config.hosxp?.database||'';

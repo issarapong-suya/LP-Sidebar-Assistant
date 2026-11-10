@@ -100,10 +100,14 @@ function isAllowed(req, config) {
 function localSetupOnly(req, res, next) {
   if (isLocal(req) && !req.get('x-forwarded-for')) return next();
   const config = db.getConfig();
+  // 1. ติดตั้งใหม่บนเซิร์ฟเวอร์ (ยังไม่มี config.json): อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN เพื่อเริ่มตั้งค่าได้ทันที
+  if (!config) return next();
+
+  // 2. แอดมินสั่ง override ด้วย Environment Variable (เช่น ALLOW_REMOTE_SETUP=true ใน systemd service หรือคำสั่งรัน)
+  if (process.env.ALLOW_REMOTE_SETUP === 'true') return next();
+
+  // 3. เซิร์ฟเวอร์ตั้งค่าแล้ว: ตรวจสอบว่าเปิด allowRemoteSetup หรือไม่ และ Client IP อยู่ในวงเครือข่ายที่อนุญาต
   if (config?.security?.allowRemoteSetup === true && isAllowed(req, config)) {
-    return next();
-  }
-  if (process.env.ALLOW_REMOTE_SETUP === 'true' && (!config || isAllowed(req, config))) {
     return next();
   }
   if (req.accepts('html') && !req.path.startsWith('/api/')) {
@@ -114,12 +118,12 @@ function localSetupOnly(req, res, next) {
       h2{color:#0f2738;margin-top:0;}p{color:#64748b;line-height:1.6;font-size:14.5px;}code{background:#f1f5f9;padding:4px 8px;border-radius:6px;color:#0f766e;}
       </style></head><body><div class="card">
       <h2>🔒 จำกัดการเข้าถึงหน้า Setup</h2>
-      <p>ตามค่าความปลอดภัยเริ่มต้น หน้า Setup อนุญาตให้เปิดจากเครื่อง Server เท่านั้น (<code>http://localhost:3030/setup</code>)</p>
-      <p>หากแอดมินต้องการเปิดจากเครื่องทำงานในวง LAN ให้เปิดตัวเลือก <b>"อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN"</b> ในหน้าตั้งค่า หรือใส่ <code>"allowRemoteSetup": true</code> ใน <code>config.json</code> ของเซิร์ฟเวอร์</p>
+      <p>หน้า Setup ถูกจำกัดสิทธิ์ความปลอดภัยไว้ หากต้องการเปิดจากเครื่องแอดมินในวง LAN กรุณาเปิดตัวเลือก <b>"อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN"</b> ในหน้าตั้งค่า หรือใส่ <code>"allowRemoteSetup": true</code> ใน <code>config.json</code> ของเซิร์ฟเวอร์</p>
+      <p style="font-size:12.5px;color:#94a3b8;margin-top:16px;">หรือใส่ <code>Environment=ALLOW_REMOTE_SETUP=true</code> ใน systemd service แล้วรีสตาร์ตเซอร์วิส</p>
       </div></body></html>
     `);
   }
-  return res.status(403).json({ success: false, error: 'หน้านี้เปิดได้จากเครื่อง Server เท่านั้น (ใช้ http://localhost:<port>/setup) หรือเปิด allowRemoteSetup ในไฟล์ตั้งค่า' });
+  return res.status(403).json({ success: false, error: 'หน้านี้เปิดได้จากเครื่อง Server เท่านั้น หรือเปิด allowRemoteSetup ในไฟล์ตั้งค่า' });
 }
 
 function persistConfig(config) {
@@ -288,22 +292,27 @@ app.get('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
 
 app.get('/api/setup/status', localSetupOnly, (req, res) => {
   const config = db.getConfig();
-  res.json({ configured: !!config, config: config ? {
-    port: config.port,
-    hospitalName: config.hospitalName || '',
-    hospitalCode: config.hospitalCode || '',
-    hosxp: { host: config.hosxp?.host || '', port: config.hosxp?.port || 3306, database: config.hosxp?.database || '', user: config.hosxp?.user || '' },
-    security: {
-      allowedLanSubnets: config.security?.allowedLanSubnets || ['127.0.0.1', '::1'],
-      allowInsecureEnrollment: config.security?.allowInsecureEnrollment !== false,
-      allowRemoteSetup: config.security?.allowRemoteSetup === true
-    },
-    schema: {
-      creatinineLabCode: config.schema?.creatinineLabCode || '155',
-      searchCharset: config.schema?.searchCharset || 'tis620',
-      labTrendCodes: config.schema?.labTrendCodes || {}
-    }
-  } : null });
+  const clientIp = requestClientIp(req);
+  res.json({
+    configured: !!config,
+    clientIp,
+    config: config ? {
+      port: config.port,
+      hospitalName: config.hospitalName || '',
+      hospitalCode: config.hospitalCode || '',
+      hosxp: { host: config.hosxp?.host || '', port: config.hosxp?.port || 3306, database: config.hosxp?.database || '', user: config.hosxp?.user || '' },
+      security: {
+        allowedLanSubnets: config.security?.allowedLanSubnets || ['127.0.0.1', '::1'],
+        allowInsecureEnrollment: config.security?.allowInsecureEnrollment !== false,
+        allowRemoteSetup: config.security?.allowRemoteSetup !== false
+      },
+      schema: {
+        creatinineLabCode: config.schema?.creatinineLabCode || '155',
+        searchCharset: config.schema?.searchCharset || 'tis620',
+        labTrendCodes: config.schema?.labTrendCodes || {}
+      }
+    } : null
+  });
 });
 
 app.get('/api/setup/companion/devices', localSetupOnly, (req, res) => {
@@ -536,7 +545,7 @@ app.post('/api/setup/save', localSetupOnly, async (req, res) => {
       security: {
         allowedLanSubnets: allow,
         allowInsecureEnrollment: body.allowInsecureEnrollment !== undefined ? Boolean(body.allowInsecureEnrollment) : true,
-        allowRemoteSetup: body.allowRemoteSetup !== undefined ? Boolean(body.allowRemoteSetup) : (old?.security?.allowRemoteSetup || false),
+        allowRemoteSetup: body.allowRemoteSetup !== undefined ? Boolean(body.allowRemoteSetup) : (old?.security?.allowRemoteSetup !== false),
         apiKey: old?.security?.apiKey || '',
         companionToken: old?.security?.companionToken || crypto.randomBytes(32).toString('hex'),
         companionDevices: old?.security?.companionDevices || [],
