@@ -98,6 +98,15 @@
     .btn-icon{font-size:16px;margin-right:7px}
     .inline-status{font-size:13px;color:#64748b}
     .companion-box{display:grid;gap:10px}
+    .login-modal-backdrop{position:fixed;inset:0;background:rgba(15,39,56,0.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px}
+    .login-modal-card{width:min(440px,100%);background:#fff;border-radius:20px;padding:32px 28px;box-shadow:0 20px 48px rgba(0,0,0,0.22);text-align:left}
+    .login-modal-card h2{font-size:20px;font-weight:800;color:#0f2738;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+    .login-modal-card p{font-size:13.5px;color:#64748b;line-height:1.6;margin:0 0 20px}
+    .login-modal-card .field{margin-bottom:14px}
+    .login-modal-card .field label{font-size:13.5px;font-weight:700;color:#1e293b}
+    .login-modal-card .btn-login{width:100%;height:46px;margin-top:10px;background:linear-gradient(135deg,#108579,#08695f);color:#fff;border:none;border-radius:11px;font-size:15px;font-weight:750;cursor:pointer}
+    .login-modal-card .btn-login:disabled{opacity:0.6;cursor:not-allowed}
+    .login-modal-card .error-box{display:none;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px}
     .token-row{display:flex;align-items:center;gap:10px;min-width:0}
     .token-value{font-family:Consolas,monospace;word-break:break-all;background:#fff;border:1px solid #e5dfc7;border-radius:9px;padding:10px 12px;flex:1;color:#564d32;font-size:12.5px}
     .copy-token{border:1px solid #d9e5e8;border-radius:10px;background:#fff;padding:9px 13px;color:#3b6470;font-size:12.5px;font-weight:650;white-space:nowrap}
@@ -118,7 +127,15 @@
 <body>
   <header class="topbar">
     <div class="brand"><img src="/doctor-icon.png" class="brand-logo" alt="Doctor Assistant Logo"><div><div class="brand-title">Sidebar Doctor Assistant</div><div class="brand-sub">Hospital setup center</div></div></div>
-    <div class="topbar-actions"><a class="audit-link" href="/setup/companion/">จัดการ Companion</a><a class="audit-link" href="/setup/audit/">ประวัติการใช้งาน</a><div class="build-chip">PRODUCT v1&nbsp; · &nbsp;BUILD 20261109.01</div></div>
+    <div class="topbar-actions">
+      <div id="adminUserBadge" style="display:none; align-items:center; gap:8px; background:#e6f4ea; border:1px solid #b7dfca; border-radius:10px; padding:6px 12px; font-size:12.5px; font-weight:600; color:#137333;">
+        <span>👤 <span id="adminBadgeName">Admin</span></span>
+        <button type="button" id="btnAdminLogout" style="background:#fff; border:1px solid #c2e7d0; border-radius:6px; padding:2px 8px; font-size:11.5px; cursor:pointer; color:#b3261e; font-weight:700;">ออกจากระบบ</button>
+      </div>
+      <a class="audit-link" href="/setup/companion/">จัดการ Companion</a>
+      <a class="audit-link" href="/setup/audit/">ประวัติการใช้งาน</a>
+      <div class="build-chip">PRODUCT v1&nbsp; · &nbsp;BUILD 20261109.01</div>
+    </div>
   </header>
 
   <main class="layout">
@@ -179,12 +196,12 @@
               <div class="field full" style="margin-top:8px">
                 <label style="display:flex; align-items:center; gap:9px; cursor:pointer; font-weight:650; color:#0f2738;">
                   <input type="checkbox" id="allowRemoteSetup" checked style="width:18px; height:18px; cursor:pointer; accent-color:#0f766e;">
-                  อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN (Remote Setup)
+                  อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN (บังคับยืนยันตัวตนด้วย HOSxP Admin)
                 </label>
-                <div class="field-help" style="margin-top:4px;">เปิดให้ผู้ดูแลระบบสามารถเปิดหน้า http://&lt;IP_SERVER&gt;:3030/setup จากเครื่องคอมพิวเตอร์ในวง LAN ที่อนุญาตได้โดยไม่ต้องล็อกอินเปิดบราวเซอร์ที่หน้าเครื่องเซิร์ฟเวอร์</div>
+                <div class="field-help" style="margin-top:4px;">เปิดให้ผู้ดูแลระบบ IT สามารถเปิดหน้าตั้งค่าจากคอมพิวเตอร์ในวง LAN ที่อนุญาตได้ โดยระบบจะบังคับให้ยืนยันตัวตนด้วยชื่อผู้ใช้และรหัสผ่านสิทธิ์ Administrator ของ HOSxP ก่อนดูหรือแก้ไขข้อมูล</div>
               </div>
             </div>
-            <div class="info-box" style="margin-top:22px; background:#f0fdfa; border:1px solid #99f6e4;"><span class="info-icon" style="color:#0f766e;">💡</span><div style="color:#115e59;"><b>สิทธิ์การเข้าถึงหน้า Setup:</b> ตัวเลือก "อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN" เปิดไว้ตามค่าเริ่มต้นเพื่อความสะดวกในการจัดการบนเซิร์ฟเวอร์แบบไม่มีหน้าจอ (Headless Server) โดยระบบจะจำกัดให้เฉพาะเครื่องในวงเครือข่ายที่ระบุเท่านั้นที่เข้าได้</div></div>
+            <div class="info-box" style="margin-top:22px; background:#f0fdfa; border:1px solid #99f6e4;"><span class="info-icon" style="color:#0f766e;">💡</span><div style="color:#115e59;"><b>ความปลอดภัยหน้า Setup:</b> เมื่อบันทึกการตั้งค่าระบบครั้งแรกเสร็จสิ้นแล้ว การเข้าใช้งานหน้า Setup จากคอมพิวเตอร์เครื่องอื่นในวง LAN จะต้องเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านสิทธิ์ Administrator จาก HOSxP เท่านั้น จึงจะสามารถดูหรือแก้ไขข้อมูลได้</div></div>
             <div class="actions"><button type="button" class="btn btn-ghost" data-back>← ย้อนกลับ</button><div class="actions-right"><button type="button" class="btn btn-quick-save" data-quick-save><span class="btn-icon">💾</span>บันทึกหน้านี้</button><button type="button" class="btn btn-primary" data-next>ถัดไป <span class="btn-icon">→</span></button></div></div>
           </div>
         </div>
@@ -240,28 +257,191 @@
     </section>
   </main>
 
+  <div id="adminLoginModal" class="login-modal-backdrop" style="display:none;">
+    <div class="login-modal-card">
+      <h2><span>🔐</span> ยืนยันตัวตนแอดมิน HOSxP</h2>
+      <p>ระบบติดตั้งและตั้งค่าฐานข้อมูลแล้ว กรุณาเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านของผู้ดูแลระบบ HOSxP (เช่น admin, sa หรือกลุ่มสิทธิ์ IT) เพื่อดูและจัดการการตั้งค่า</p>
+      <div id="loginError" class="error-box"></div>
+      <form id="adminLoginForm" onsubmit="event.preventDefault(); submitAdminLogin();">
+        <div class="field">
+          <label for="adminUsername">ชื่อผู้ใช้ HOSxP (Username) <span class="required">*</span></label>
+          <input id="adminUsername" placeholder="เช่น admin, sa หรือชื่อบัญชี IT" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="adminPassword">รหัสผ่าน HOSxP (Password) <span class="required">*</span></label>
+          <input id="adminPassword" type="password" placeholder="รหัสผ่าน HOSxP" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btnAdminLogin" class="btn-login">เข้าสู่ระบบ</button>
+      </form>
+      <div style="margin-top:16px; text-align:center; font-size:12px; color:#94a3b8;">
+        ตรวจสอบสิทธิ์จากตาราง opduser ของฐานข้อมูล HOSxP
+      </div>
+    </div>
+  </div>
+
 <script>
 'use strict';
 const el=id=>document.getElementById(id);
 const stepTitles=[['เชื่อมต่อฐานข้อมูล HOSxP','ขั้นตอนแรกที่จำเป็น เพื่อให้ผู้ช่วยแพทย์อ่านข้อมูลจากระบบได้'],['ตั้งค่าโรงพยาบาลและ Server','กำหนดชื่อและวงเครือข่ายที่ให้บริการ'],['ตั้งค่ารายการ Lab','ปรับ charset และรหัสรายการให้ตรงกับ HOSxP'],['ตรวจทานและบันทึก','ตรวจค่าทั้งหมด แล้วเริ่มระบบ']];
-let currentStep=0, testedFingerprint='';
+let currentStep=0, testedFingerprint='', currentSession=null;
 const dbFields=['dbHost','dbPort','dbName','dbUser','dbPassword'];
-function form(){return {hospitalName:el('hospitalName').value,hospitalCode:el('hospitalCode').value,port:el('serverPort').value,allowedLanSubnets:el('allowedLanSubnets').value,allowInsecureEnrollment:el('allowInsecureEnrollment').checked,allowRemoteSetup:el('allowRemoteSetup').checked,creatinineLabCode:el('creatinineLabCode').value,searchCharset:el('searchCharset').value,labTrendCodes:{ldl:el('labCodeLdl').value,hct:el('labCodeHct').value,platelet:el('labCodePlatelet').value,uacr:el('labCodeUacr').value,potassium:el('labCodeK').value,sodium:el('labCodeNa').value,bun:el('labCodeBun').value,ast:el('labCodeAst').value,alt:el('labCodeAlt').value,uric:el('labCodeUric').value},hosxp:{host:el('dbHost').value,port:el('dbPort').value,database:el('dbName').value,user:el('dbUser').value,password:el('dbPassword').value}}}
+
+function form(){
+  return {
+    hospitalName: el('hospitalName').value,
+    hospitalCode: el('hospitalCode').value,
+    port: el('serverPort').value,
+    allowedLanSubnets: el('allowedLanSubnets').value,
+    allowInsecureEnrollment: el('allowInsecureEnrollment').checked,
+    allowRemoteSetup: el('allowRemoteSetup').checked,
+    creatinineLabCode: el('creatinineLabCode').value,
+    searchCharset: el('searchCharset').value,
+    labTrendCodes: {
+      ldl: el('labCodeLdl').value,
+      hct: el('labCodeHct').value,
+      platelet: el('labCodePlatelet').value,
+      uacr: el('labCodeUacr').value,
+      potassium: el('labCodeK').value,
+      sodium: el('labCodeNa').value,
+      bun: el('labCodeBun').value,
+      ast: el('labCodeAst').value,
+      alt: el('labCodeAlt').value,
+      uric: el('labCodeUric').value
+    },
+    hosxp: {
+      host: el('dbHost').value,
+      port: el('dbPort').value,
+      database: el('dbName').value,
+      user: el('dbUser').value,
+      password: el('dbPassword').value
+    }
+  };
+}
+
 function fingerprint(){return JSON.stringify(dbFields.map(id=>el(id).value.trim()))}
 function setStatus(text,type){const box=el('status');box.textContent=text;box.className=`info-box db-status show ${type||''}`}
 function setDbStatus(text,type){const box=el('dbStatus');box.className=`info-box db-status show ${type||''}`;el('dbStatusText').textContent=text}
-function activateStep(index){if(index>0&&!testedFingerprint)return;currentStep=index;document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.panel)!==index);document.querySelectorAll('[data-step]').forEach(button=>{const n=Number(button.dataset.step);button.classList.toggle('active',n===index);button.classList.toggle('complete',n<index);button.disabled=n>0&&!testedFingerprint});el('pageTitle').textContent=stepTitles[index][0];el('pageSubtitle').textContent=stepTitles[index][1];el('stepCount').textContent=`ขั้นตอน ${index+1} จาก 4`;el('progressFill').style.width=`${(index+1)*25}%`;if(index===3)updateSummary();window.scrollTo({top:0,behavior:'smooth'})}
-function updateSummary(){el('summaryDatabase').textContent=`${el('dbName').value.trim()||'ฐานข้อมูล'} · ${el('dbHost').value.trim()||'Host'}`;el('summaryHospital').textContent=el('hospitalName').value.trim()||'ยังไม่ระบุ'}
-async function request(url){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form())});const data=await response.json();if(!response.ok||!data.success){const error=new Error(data.error||'เกิดข้อผิดพลาด');error.data=data;throw error}return data}
-function showGrantDetails(details){const box=el('grantDetails');if(!details){box.hidden=true;return}box.hidden=false;el('grantIdentity').replaceChildren();const identity=details.identity||{};[['เชื่อมต่อมาจาก',identity.connected_user],['MariaDB account ที่ match',identity.authenticated_account],['Active role',details.activeRole]].forEach(([label,value])=>{const item=document.createElement('div');const title=document.createElement('small');title.textContent=label;const content=document.createElement('b');content.textContent=value||'ไม่พบข้อมูล';item.append(title,content);el('grantIdentity').append(item)});const list=el('grantLines');list.replaceChildren();(details.grants||[]).forEach(grant=>{const row=document.createElement('li');row.textContent=grant;list.append(row)});box.open=true}
-function showProvision(){const box=el('companionProvision');box.hidden=false;box.innerHTML='<div><strong>ติดตั้ง Companion บน workstation</strong><br>เปิดหน้า Install จากเครื่อง HOSxP แล้วดาวน์โหลดและเปิด Companion ระบบจะลงทะเบียนเครื่องให้อัตโนมัติ</div><a class="copy-token" href="/install/">เปิดหน้า Install</a><a class="copy-token" href="/setup/companion/">จัดการอุปกรณ์</a>';}
+
+function activateStep(index){
+  if(index>0&&!testedFingerprint)return;
+  currentStep=index;
+  document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=Number(panel.dataset.panel)!==index);
+  document.querySelectorAll('[data-step]').forEach(button=>{
+    const n=Number(button.dataset.step);
+    button.classList.toggle('active',n===index);
+    button.classList.toggle('complete',n<index);
+    button.disabled=n>0&&!testedFingerprint;
+  });
+  el('pageTitle').textContent=stepTitles[index][0];
+  el('pageSubtitle').textContent=stepTitles[index][1];
+  el('stepCount').textContent=`ขั้นตอน ${index+1} จาก 4`;
+  el('progressFill').style.width=`${(index+1)*25}%`;
+  if(index===3)updateSummary();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function updateSummary(){
+  el('summaryDatabase').textContent=`${el('dbName').value.trim()||'ฐานข้อมูล'} · ${el('dbHost').value.trim()||'Host'}`;
+  el('summaryHospital').textContent=el('hospitalName').value.trim()||'ยังไม่ระบุ';
+}
+
+async function request(url){
+  const response=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(form())
+  });
+  const data=await response.json();
+  if (response.status === 401 && data?.requireLogin) {
+    el('adminLoginModal').style.display = 'flex';
+    const error = new Error(data.error || 'กรุณาเข้าสู่ระบบด้วยสิทธิ์ HOSxP Administrator');
+    error.data = data;
+    throw error;
+  }
+  if(!response.ok||!data.success){
+    const error=new Error(data.error||'เกิดข้อผิดพลาด');
+    error.data=data;
+    throw error;
+  }
+  return data;
+}
+
+function showGrantDetails(details){
+  const box=el('grantDetails');
+  if(!details){box.hidden=true;return}
+  box.hidden=false;
+  el('grantIdentity').replaceChildren();
+  const identity=details.identity||{};
+  [['เชื่อมต่อมาจาก',identity.connected_user],['MariaDB account ที่ match',identity.authenticated_account],['Active role',details.activeRole]].forEach(([label,value])=>{
+    const item=document.createElement('div');
+    const title=document.createElement('small');
+    title.textContent=label;
+    const content=document.createElement('b');
+    content.textContent=value||'ไม่พบข้อมูล';
+    item.append(title,content);
+    el('grantIdentity').append(item);
+  });
+  const list=el('grantLines');
+  list.replaceChildren();
+  (details.grants||[]).forEach(grant=>{
+    const row=document.createElement('li');
+    row.textContent=grant;
+    list.append(row);
+  });
+  box.open=true;
+}
+
+function showProvision(){
+  const box=el('companionProvision');
+  box.hidden=false;
+  box.innerHTML='<div><strong>ติดตั้ง Companion บน workstation</strong><br>เปิดหน้า Install จากเครื่อง HOSxP แล้วดาวน์โหลดและเปิด Companion ระบบจะลงทะเบียนเครื่องให้อัตโนมัติ</div><a class="copy-token" href="/install/">เปิดหน้า Install</a><a class="copy-token" href="/setup/companion/">จัดการอุปกรณ์</a>';
+}
+
 document.querySelectorAll('[data-step]').forEach(button=>button.addEventListener('click',()=>activateStep(Number(button.dataset.step))));
 document.querySelectorAll('[data-next]').forEach(button=>button.addEventListener('click',()=>activateStep(Math.min(currentStep+1,3))));
 document.querySelectorAll('[data-back]').forEach(button=>button.addEventListener('click',()=>activateStep(Math.max(currentStep-1,0))));
 el('nextFromDb').addEventListener('click',()=>activateStep(1));
-dbFields.forEach(id=>el(id).addEventListener('input',()=>{if(testedFingerprint){testedFingerprint='';el('nextFromDb').disabled=true;document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=true});el('testHint').textContent='ข้อมูลฐานข้อมูลเปลี่ยนแล้ว กรุณาทดสอบใหม่';el('dbStatus').className='info-box db-status'}}));
-el('togglePassword').addEventListener('click',()=>{const input=el('dbPassword');input.type=input.type==='password'?'text':'password'});
-el('testButton').addEventListener('click',async()=>{const button=el('testButton');button.disabled=true;button.innerHTML='<span class="btn-icon">◌</span>กำลังตรวจสอบ...';showGrantDetails(null);try{if(!el('dbHost').value.trim()||!el('dbName').value.trim()||!el('dbUser').value.trim())throw new Error('กรอก Host, ชื่อฐานข้อมูล และบัญชีฐานข้อมูลให้ครบ');const data=await request('/api/setup/test-database');if(!data.readOnly)throw new Error('ระบบยืนยันสิทธิ์ SELECT-only ไม่ได้');testedFingerprint=fingerprint();el('nextFromDb').disabled=false;document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=false});el('testHint').textContent='เชื่อมต่อสำเร็จ · ขั้นตอนถัดไปพร้อมใช้งาน';setDbStatus(`เชื่อมต่อ ${data.database} สำเร็จ · account ที่ MariaDB จับคู่คือ ${data.identity?.authenticated_account||el('dbUser').value} · ยืนยัน SELECT-only แล้ว (สิทธิ์ SELECT ฐานอื่นยอมรับได้)`, 'success')}catch(error){testedFingerprint='';el('nextFromDb').disabled=true;setDbStatus(error.message,'error');showGrantDetails(error.data?.grantDetails)}finally{button.disabled=false;button.innerHTML='<span class="btn-icon">⌕</span>ทดสอบฐานข้อมูล'}});
+
+dbFields.forEach(id=>el(id).addEventListener('input',()=>{
+  if(testedFingerprint){
+    testedFingerprint='';
+    el('nextFromDb').disabled=true;
+    document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=true});
+    el('testHint').textContent='ข้อมูลฐานข้อมูลเปลี่ยนแล้ว กรุณาทดสอบใหม่';
+    el('dbStatus').className='info-box db-status';
+  }
+}));
+
+el('togglePassword').addEventListener('click',()=>{
+  const input=el('dbPassword');
+  input.type=input.type==='password'?'text':'password';
+});
+
+el('testButton').addEventListener('click',async()=>{
+  const button=el('testButton');
+  button.disabled=true;
+  button.innerHTML='<span class="btn-icon">◌</span>กำลังตรวจสอบ...';
+  showGrantDetails(null);
+  try{
+    if(!el('dbHost').value.trim()||!el('dbName').value.trim()||!el('dbUser').value.trim())throw new Error('กรอก Host, ชื่อฐานข้อมูล และบัญชีฐานข้อมูลให้ครบ');
+    const data=await request('/api/setup/test-database');
+    if(!data.readOnly)throw new Error('ระบบยืนยันสิทธิ์ SELECT-only ไม่ได้');
+    testedFingerprint=fingerprint();
+    el('nextFromDb').disabled=false;
+    document.querySelectorAll('[data-step]').forEach(button=>{if(Number(button.dataset.step)>0)button.disabled=false});
+    el('testHint').textContent='เชื่อมต่อสำเร็จ · ขั้นตอนถัดไปพร้อมใช้งาน';
+    setDbStatus(`เชื่อมต่อ ${data.database} สำเร็จ · account ที่ MariaDB จับคู่คือ ${data.identity?.authenticated_account||el('dbUser').value} · ยืนยัน SELECT-only แล้ว (สิทธิ์ SELECT ฐานอื่นยอมรับได้)`, 'success');
+  }catch(error){
+    testedFingerprint='';
+    el('nextFromDb').disabled=true;
+    setDbStatus(error.message,'error');
+    showGrantDetails(error.data?.grantDetails);
+  }finally{
+    button.disabled=false;
+    button.innerHTML='<span class="btn-icon">⌕</span>ทดสอบฐานข้อมูล';
+  }
+});
+
 async function doSave(button){
   if(!testedFingerprint||fingerprint()!==testedFingerprint){
     setStatus('ข้อมูลการเชื่อมต่อฐานข้อมูลเปลี่ยนไป กรุณากลับไปทดสอบในขั้นตอนที่ 1 ใหม่ก่อนบันทึก','error');
@@ -288,8 +468,10 @@ async function doSave(button){
     btn.innerHTML = origHtml;
   }
 }
+
 el('saveButton').addEventListener('click',()=>doSave(el('saveButton')));
 document.querySelectorAll('[data-quick-save]').forEach(btn=>btn.addEventListener('click',()=>doSave(btn)));
+
 el('btnAutoDetectLabs').addEventListener('click', async () => {
   const btn = el('btnAutoDetectLabs');
   const summaryBox = el('autoDetectSummary');
@@ -302,6 +484,10 @@ el('btnAutoDetectLabs').addEventListener('click', async () => {
       body: JSON.stringify(form())
     });
     const data = await res.json();
+    if (res.status === 401 && data?.requireLogin) {
+      el('adminLoginModal').style.display = 'flex';
+      throw new Error(data.error || 'กรุณาเข้าสู่ระบบด้วยสิทธิ์ HOSxP Administrator');
+    }
     if (!res.ok || !data.success) throw new Error(data.error || 'ตรวจจับไม่สำเร็จ');
     const d = data.detected;
     if (d.creatinine && d.creatinine.length) el('creatinineLabCode').value = d.creatinine.join(', ');
@@ -316,11 +502,18 @@ el('btnAutoDetectLabs').addEventListener('click', async () => {
     if (d.platelet) el('labCodePlatelet').value = d.platelet.join(', ');
     if (d.uacr) el('labCodeUacr').value = d.uacr.join(', ');
 
+    // บันทึกการตั้งค่าลง server อัตโนมัติทันทีเพื่อไม่ให้ค่าหายเวลารีเฟรช
+    let savedMsg = '';
+    try {
+      await request('/api/setup/save');
+      savedMsg = ' · <b style="color:#047857;">บันทึกรหัสลงระบบเรียบร้อย (รีเฟรชแล้วไม่หาย)</b>';
+    } catch (_) {}
+
     summaryBox.style.display = 'block';
     summaryBox.style.background = '#ecfdf5';
     summaryBox.style.borderColor = '#6ee7b7';
     summaryBox.style.color = '#065f46';
-    summaryBox.innerHTML = '✅ <b>ตรวจพบและเติมรหัสแล็ปเรียบร้อย:</b> Creatinine (' + (d.creatinine.join(',') || '-') + '), K (' + (d.potassium.join(',') || '-') + '), Na (' + (d.sodium.join(',') || '-') + '), BUN (' + (d.bun.join(',') || '-') + '), AST (' + (d.ast.join(',') || '-') + '), ALT (' + (d.alt.join(',') || '-') + '), Uric (' + (d.uric.join(',') || '-') + '), LDL (' + (d.ldl.join(',') || '-') + '), Hct (' + (d.hct.join(',') || '-') + '), Plt (' + (d.platelet.join(',') || '-') + '), UACR (' + (d.uacr.join(',') || '-') + ')';
+    summaryBox.innerHTML = '✅ <b>ตรวจพบและเติมรหัสแล็ป:</b> Creatinine (' + (d.creatinine?.join(',') || '-') + '), K (' + (d.potassium?.join(',') || '-') + '), Na (' + (d.sodium?.join(',') || '-') + '), BUN (' + (d.bun?.join(',') || '-') + '), AST (' + (d.ast?.join(',') || '-') + '), ALT (' + (d.alt?.join(',') || '-') + '), Uric (' + (d.uric?.join(',') || '-') + '), LDL (' + (d.ldl?.join(',') || '-') + '), Hct (' + (d.hct?.join(',') || '-') + '), Plt (' + (d.platelet?.join(',') || '-') + '), UACR (' + (d.uacr?.join(',') || '-') + ')' + savedMsg;
   } catch (err) {
     summaryBox.style.display = 'block';
     summaryBox.style.background = '#fef2f2';
@@ -332,53 +525,159 @@ el('btnAutoDetectLabs').addEventListener('click', async () => {
     btn.innerHTML = '🪄 ค้นหาและจับคู่รหัส Lab อัตโนมัติ';
   }
 });
-fetch('/api/setup/status').then(response=>response.json()).then(data=>{
-  const { config, clientIp } = data || {};
-  if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== 'localhost') {
-    const helpBox = el('allowedSubnetsHelp');
-    if (helpBox) helpBox.innerHTML = `ตรวจพบ IP เครื่องของคุณขณะนี้: <b style="color:#0f766e;">${clientIp}</b> (คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 192.168. หรือ 172.16.)`;
-    const parts = clientIp.split('.');
-    if (parts.length === 4) {
-      const suggestedSubnet = `${parts[0]}.${parts[1]}.${parts[2]}.`;
-      const current = el('allowedLanSubnets').value.split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean);
-      if (!current.includes(suggestedSubnet)) {
-        current.push(suggestedSubnet);
-        el('allowedLanSubnets').value = current.join(',');
+
+async function checkAdminSession() {
+  try {
+    const res = await fetch('/api/setup/auth/session');
+    const data = await res.json();
+    currentSession = data;
+    const badge = el('adminUserBadge');
+    const modal = el('adminLoginModal');
+    if (data.configured && !data.authenticated) {
+      modal.style.display = 'flex';
+      badge.style.display = 'none';
+    } else {
+      modal.style.display = 'none';
+      if (data.authenticated && data.displayName) {
+        badge.style.display = 'inline-flex';
+        el('adminBadgeName').textContent = data.displayName;
+      } else {
+        badge.style.display = 'none';
       }
     }
+    return data;
+  } catch (e) {
+    console.error('checkAdminSession error', e);
+    return null;
   }
-  if(!config)return;
-  el('hospitalName').value=config.hospitalName||'';
-  el('hospitalCode').value=config.hospitalCode||'';
-  el('serverPort').value=config.port||3030;
-  el('allowedLanSubnets').value=(config.security?.allowedLanSubnets||['127.0.0.1','::1']).join(',');
-  el('allowInsecureEnrollment').checked=config.security?.allowInsecureEnrollment!==false;
-  el('allowRemoteSetup').checked=config.security?.allowRemoteSetup!==false;
-  el('dbHost').value=config.hosxp?.host||'';
-  el('dbPort').value=config.hosxp?.port||3306;
-  el('dbName').value=config.hosxp?.database||'';
-  el('dbUser').value=config.hosxp?.user||'';
-  el('passwordHelp').textContent='เว้นว่างไว้เพื่อคงรหัสผ่านเดิม';
-  el('creatinineLabCode').value=config.schema?.creatinineLabCode||'155';
-  el('searchCharset').value=config.schema?.searchCharset||'tis620';
-  const codes=config.schema?.labTrendCodes||{};
-  el('labCodeLdl').value=(codes.ldl||[]).join(', ');
-  el('labCodeHct').value=(codes.hct||[]).join(', ');
-  el('labCodePlatelet').value=(codes.platelet||[]).join(', ');
-  el('labCodeUacr').value=(codes.uacr||[]).join(', ');
-  el('labCodeK').value=(codes.potassium||[]).join(', ');
-  el('labCodeNa').value=(codes.sodium||[]).join(', ');
-  el('labCodeBun').value=(codes.bun||[]).join(', ');
-  el('labCodeAst').value=(codes.ast||[]).join(', ');
-  el('labCodeAlt').value=(codes.alt||[]).join(', ');
-  el('labCodeUric').value=(codes.uric||[]).join(', ');
+}
 
-  // ปลดล็อกทุกขั้นตอนสำหรับระบบที่เคยตั้งค่าไว้แล้ว เพื่อให้คลิกไปแก้ไขและกดบันทึกได้ทันที
-  testedFingerprint=fingerprint();
-  el('nextFromDb').disabled=false;
-  document.querySelectorAll('[data-step]').forEach(button=>{button.disabled=false;});
-  el('testHint').textContent='เชื่อมต่อฐานข้อมูลเดิมเรียบร้อย (คลิกข้ามไปหน้าอื่นหรือกดบันทึกได้ทันที)';
-}).catch(()=>{});
+async function submitAdminLogin() {
+  const errBox = el('loginError');
+  const btn = el('btnAdminLogin');
+  const username = el('adminUsername').value.trim();
+  const password = el('adminPassword').value;
+  if (!username || !password) {
+    errBox.style.display = 'block';
+    errBox.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน HOSxP';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'กำลังตรวจสอบสิทธิ์...';
+  errBox.style.display = 'none';
+  try {
+    const res = await fetch('/api/setup/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+    }
+    el('adminLoginModal').style.display = 'none';
+    await checkAdminSession();
+    await loadSetupStatus();
+  } catch (err) {
+    errBox.style.display = 'block';
+    errBox.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'เข้าสู่ระบบ';
+  }
+}
+
+el('btnAdminLogout').addEventListener('click', async () => {
+  try {
+    await fetch('/api/setup/auth/logout', { method: 'POST' });
+  } catch (_) {}
+  location.reload();
+});
+
+async function loadSetupStatus() {
+  try {
+    const response = await fetch('/api/setup/status');
+    const data = await response.json();
+    const { config, clientIp, currentPort } = data || {};
+
+    if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== 'localhost') {
+      const helpBox = el('allowedSubnetsHelp');
+      if (helpBox) helpBox.innerHTML = `ตรวจพบ IP เครื่องของคุณขณะนี้: <b style="color:#0f766e;">${clientIp}</b> (คั่นด้วยจุลภาค ใช้ prefix ลงท้ายจุด เช่น 192.168. หรือ 172.16.)`;
+      const parts = clientIp.split('.');
+      if (parts.length === 4) {
+        const suggestedSubnet = `${parts[0]}.${parts[1]}.${parts[2]}.`;
+        const current = el('allowedLanSubnets').value.split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean);
+        if (!current.includes(suggestedSubnet)) {
+          current.push(suggestedSubnet);
+          el('allowedLanSubnets').value = current.join(',');
+        }
+      }
+    }
+
+    // กำหนดพอร์ตบริการจาก config เดิม หรือพอร์ตที่ server กำลังใช้งานอยู่จริง (เช่น 3031)
+    el('serverPort').value = config?.port || currentPort || 3030;
+
+    if (!config) return;
+
+    el('hospitalName').value = config.hospitalName || '';
+    el('hospitalCode').value = config.hospitalCode || '';
+    el('allowedLanSubnets').value = (config.security?.allowedLanSubnets || ['127.0.0.1','::1']).join(',');
+    el('allowInsecureEnrollment').checked = config.security?.allowInsecureEnrollment !== false;
+    el('allowRemoteSetup').checked = config.security?.allowRemoteSetup !== false;
+    el('dbHost').value = config.hosxp?.host || '';
+    el('dbPort').value = config.hosxp?.port || 3306;
+    el('dbName').value = config.hosxp?.database || '';
+    el('dbUser').value = config.hosxp?.user || '';
+    el('passwordHelp').textContent = 'เว้นว่างไว้เพื่อคงรหัสผ่านเดิม';
+    el('creatinineLabCode').value = config.schema?.creatinineLabCode || '155';
+    el('searchCharset').value = config.schema?.searchCharset || 'tis620';
+
+    const codes = config.schema?.labTrendCodes || {};
+    el('labCodeLdl').value = (codes.ldl || []).join(', ');
+    el('labCodeHct').value = (codes.hct || []).join(', ');
+    el('labCodePlatelet').value = (codes.platelet || []).join(', ');
+    el('labCodeUacr').value = (codes.uacr || []).join(', ');
+    el('labCodeK').value = (codes.potassium || []).join(', ');
+    el('labCodeNa').value = (codes.sodium || []).join(', ');
+    el('labCodeBun').value = (codes.bun || []).join(', ');
+    el('labCodeAst').value = (codes.ast || []).join(', ');
+    el('labCodeAlt').value = (codes.alt || []).join(', ');
+    el('labCodeUric').value = (codes.uric || []).join(', ');
+
+    // แสดงสรุปรหัสแล็ปที่บันทึกไว้ในปัจจุบัน
+    const hasAnyLab = Object.values(codes).some(arr => Array.isArray(arr) && arr.length > 0) || config.schema?.creatinineLabCode;
+    if (hasAnyLab) {
+      const summaryBox = el('autoDetectSummary');
+      summaryBox.style.display = 'block';
+      summaryBox.style.background = '#f0fdf4';
+      summaryBox.style.borderColor = '#86efac';
+      summaryBox.style.color = '#15803d';
+      summaryBox.innerHTML = '📌 <b>รหัส Lab ที่บันทึกไว้ในปัจจุบัน:</b> ' +
+        'Cr (' + (config.schema?.creatinineLabCode || '-') + '), ' +
+        'K (' + ((codes.potassium || []).join(',') || '-') + '), ' +
+        'Na (' + ((codes.sodium || []).join(',') || '-') + '), ' +
+        'BUN (' + ((codes.bun || []).join(',') || '-') + '), ' +
+        'AST (' + ((codes.ast || []).join(',') || '-') + '), ' +
+        'ALT (' + ((codes.alt || []).join(',') || '-') + '), ' +
+        'Uric (' + ((codes.uric || []).join(',') || '-') + '), ' +
+        'LDL (' + ((codes.ldl || []).join(',') || '-') + '), ' +
+        'Hct (' + ((codes.hct || []).join(',') || '-') + '), ' +
+        'Plt (' + ((codes.platelet || []).join(',') || '-') + '), ' +
+        'UACR (' + ((codes.uacr || []).join(',') || '-') + ')';
+    }
+
+    // ปลดล็อกทุกขั้นตอนสำหรับระบบที่เคยตั้งค่าไว้แล้ว เพื่อให้คลิกไปแก้ไขและกดบันทึกได้ทันที
+    testedFingerprint = fingerprint();
+    el('nextFromDb').disabled = false;
+    document.querySelectorAll('[data-step]').forEach(button => { button.disabled = false; });
+    el('testHint').textContent = 'เชื่อมต่อฐานข้อมูลเดิมเรียบร้อย (คลิกข้ามไปหน้าอื่นหรือกดบันทึกได้ทันที)';
+  } catch (err) {
+    console.error('loadSetupStatus error', err);
+  }
+}
+
+// ตรวจสอบเซสชันและโหลดสถานะเมื่อเปิดหน้าเว็บ
+checkAdminSession().then(() => loadSetupStatus());
 </script>
 </body>
 </html>

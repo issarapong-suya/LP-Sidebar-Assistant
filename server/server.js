@@ -16,6 +16,7 @@ const PRODUCT_VERSION = '1';
 const PRODUCT_BUILD = '20261109.01';
 const companionSessions = new Map();
 const manualSessions = new Map();
+const setupAdminSessions = new Map();
 const enrollmentCodes = new Map();
 const enrollmentAttempts = new Map();
 const ENROLLMENT_TTL_MS = 30 * 60 * 1000;
@@ -123,6 +124,21 @@ function isAllowed(req, config) {
   return Boolean(key && req.get('x-api-key') === key);
 }
 
+function getSetupAdminSession(req) {
+  const cookie = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith('doctor_setup_session='));
+  const token = cookie ? cookie.slice('doctor_setup_session='.length) : (req.get('x-setup-token') || '');
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
+  const session = setupAdminSessions.get(token);
+  if (!session) return null;
+  const now = Date.now();
+  if (now - session.createdAt > 8 * 60 * 60 * 1000 || now - session.lastActivity > 60 * 60 * 1000) {
+    setupAdminSessions.delete(token);
+    return null;
+  }
+  session.lastActivity = now;
+  return session;
+}
+
 function localSetupOnly(req, res, next) {
   // 1. เข้าใช้งานจาก localhost บนเซิร์ฟเวอร์โดยตรง หรือผ่าน SSH Tunnel
   if (isLocal(req) && !req.get('x-forwarded-for')) return next();
@@ -134,25 +150,48 @@ function localSetupOnly(req, res, next) {
   // 3. ติดตั้งใหม่บนเซิร์ฟเวอร์ (ยังไม่มี config.json): อนุญาตให้เข้าหน้า Setup เพื่อเริ่มตั้งค่าได้ทันที
   if (!config) return next();
 
-  // 4. มีการเปิดตัวเลือก allowRemoteSetup ไว้ (ค่าเริ่มต้นคือเปิด): อนุญาตให้แอดมินจัดการหน้า Setup ได้อย่างราบรื่น
-  // ไม่นำ filter ของ allowedLanSubnets มาบล็อก เพื่อป้องกันแอดมินล็อกตัวเองออกหากพิมพ์คอมม่าตกหรือ IP ผ่าน NAT
-  if (config?.security?.allowRemoteSetup !== false) {
+  // 4. ตรวจสอบว่า IP มาจากวง LAN ที่อนุญาตหรือไม่ (ถ้าไม่ได้รับอนุญาต แสดงหน้าแจ้งเตือน)
+  if (!isAllowed(req, config)) {
+    const clientIp = requestClientIp(req);
+    const rules = Array.isArray(config?.security?.allowedLanSubnets) ? config.security.allowedLanSubnets.join(', ') : 'ไม่มี';
+    if (req.accepts('html') && !(req.originalUrl || '').startsWith('/api/')) {
+      return res.status(403).send(`
+        <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>เครือข่ายนี้ไม่ได้รับอนุญาต</title>
+        <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;}
+        .card{max-width:540px;margin:20px;background:#fff;padding:32px;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.08);text-align:center;}
+        h2{color:#0f2738;margin-top:0;}p{color:#64748b;line-height:1.6;font-size:14.5px;}
+        .ip-box{background:#f1f5f9;border:1px solid #cbd5e1;padding:12px;border-radius:8px;margin:16px 0;font-size:16px;color:#0f766e;font-weight:700;}
+        </style></head><body><div class="card">
+        <h2>🔒 เครือข่ายนี้ไม่ได้รับอนุญาต</h2>
+        <p>IP เครื่องของคุณไม่อยู่ในรายการวงเครือข่าย LAN ที่อนุญาตให้จัดการระบบ</p>
+        <div class="ip-box">IP ของคุณ: ${clientIp}</div>
+        <p style="font-size:13px;color:#94a3b8;">วงเครือข่ายที่อนุญาตในปัจจุบัน: <code>${rules}</code></p>
+        </div></body></html>
+      `);
+    }
+    return res.status(403).json({ success: false, error: 'เครือข่ายนี้ไม่ได้รับอนุญาต' });
+  }
+
+  // 5. สำหรับหน้าเว็บ Setup (HTML, Static files) และ API ตรวจสอบสถานะ/ล็อกอิน: อนุญาตให้โหลดได้
+  const fullUrl = req.originalUrl || req.url || '';
+  const isSetupAssetOrAuth = fullUrl.startsWith('/setup') || fullUrl.startsWith('/api/setup/auth') || fullUrl === '/api/setup/status' || fullUrl.includes('.') || req.path === '/' || req.path === '/index.html';
+  if (isSetupAssetOrAuth) {
     return next();
   }
-  if (req.accepts('html') && !req.path.startsWith('/api/')) {
-    return res.status(403).send(`
-      <!DOCTYPE html><html><head><meta charset="utf-8"><title>Setup Restricted</title>
-      <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;}
-      .card{max-width:520px;background:#fff;padding:32px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,0.08);text-align:center;}
-      h2{color:#0f2738;margin-top:0;}p{color:#64748b;line-height:1.6;font-size:14.5px;}code{background:#f1f5f9;padding:4px 8px;border-radius:6px;color:#0f766e;}
-      </style></head><body><div class="card">
-      <h2>🔒 จำกัดการเข้าถึงหน้า Setup</h2>
-      <p>หน้า Setup ถูกจำกัดสิทธิ์ความปลอดภัยไว้ หากต้องการเปิดจากเครื่องแอดมินในวง LAN กรุณาเปิดตัวเลือก <b>"อนุญาตให้เข้าหน้า Setup จากเครื่องแอดมินในวง LAN"</b> ในหน้าตั้งค่า หรือใส่ <code>"allowRemoteSetup": true</code> ใน <code>config.json</code> ของเซิร์ฟเวอร์</p>
-      <p style="font-size:12.5px;color:#94a3b8;margin-top:16px;">หรือใส่ <code>Environment=ALLOW_REMOTE_SETUP=true</code> ใน systemd service แล้วรีสตาร์ตเซอร์วิส</p>
-      </div></body></html>
-    `);
+
+  // 6. สำหรับ API จัดการระบบและการตั้งค่าทั้งหมด (save, test-db, auto-detect-labs, companion devices, audit):
+  // ต้องยืนยันตัวตนด้วย HOSxP Administrator
+  const adminSession = getSetupAdminSession(req);
+  if (adminSession) {
+    return next();
   }
-  return res.status(403).json({ success: false, error: 'หน้านี้เปิดได้จากเครื่อง Server เท่านั้น หรือเปิด allowRemoteSetup ในไฟล์ตั้งค่า' });
+
+  return res.status(401).json({
+    success: false,
+    requireLogin: true,
+    error: 'กรุณาเข้าสู่ระบบด้วยสิทธิ์ HOSxP Administrator ก่อนเข้าจัดการระบบ'
+  });
 }
 
 function persistConfig(config) {
@@ -344,17 +383,129 @@ app.all('/api/setup/auto-detect-labs', localSetupOnly, async (req, res) => {
   }
 });
 
-app.get('/api/setup/status', localSetupOnly, (req, res) => {
+app.post('/api/setup/auth/login', async (req, res) => {
+  const ip = requestClientIp(req);
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '');
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'กรอกชื่อผู้ใช้และรหัสผ่าน HOSxP ให้ครบถ้วน' });
+  }
+
   const config = db.getConfig();
-  const clientIp = requestClientIp(req);
+  if (!config?.hosxp?.host) {
+    return res.status(503).json({ success: false, error: 'ยังไม่ได้ตั้งค่าการเชื่อมต่อฐานข้อมูล HOSxP' });
+  }
+
+  try {
+    const pool = db.getPool();
+    const [rows] = await pool.execute(`
+      SELECT loginname, name, account_disable, groupname, accessright
+      FROM opduser
+      WHERE loginname = ? AND (
+        (passweb IS NOT NULL AND LOWER(passweb) = LOWER(MD5(?))) OR
+        (password IS NOT NULL AND LOWER(password) = LOWER(MD5(?)))
+      )
+      LIMIT 1
+    `, [username, password, password]);
+
+    const user = rows[0];
+    const disabled = user && ['Y', '1'].includes(String(user.account_disable || '').trim().toUpperCase());
+    if (!user || disabled) {
+      audit.record({ requestId: req.requestId, action: 'SETUP_ADMIN_LOGIN_FAILED', actor: username, clientIp: ip, outcome: 'denied' });
+      return res.status(401).json({ success: false, error: 'ชื่อผู้ใช้หรือรหัสผ่าน HOSxP ไม่ถูกต้อง หรือบัญชีนี้ถูกระงับการใช้งาน' });
+    }
+
+    const group = String(user.groupname || '').toLowerCase();
+    const right = String(user.accessright || '').toLowerCase();
+    const login = String(user.loginname || '').toLowerCase();
+    const isAdmin = login === 'admin' || login === 'administrator' || login === 'sa'
+      || group.includes('admin') || group.includes('it') || group.includes('system')
+      || right.includes('admin') || right.includes('sys_admin');
+
+    if (!isAdmin) {
+      audit.record({ requestId: req.requestId, action: 'SETUP_ADMIN_ACCESS_DENIED_NOT_ADMIN', actor: username, clientIp: ip, outcome: 'denied' });
+      return res.status(403).json({
+        success: false,
+        error: `บัญชี "${user.name || user.loginname}" ไม่มีสิทธิ์ระดับ Administrator ใน HOSxP (ต้องมีกลุ่มสิทธิ์ Admin หรือ IT)`
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const now = Date.now();
+    setupAdminSessions.set(token, {
+      user: String(user.loginname),
+      displayName: String(user.name || user.loginname),
+      groupname: String(user.groupname || 'Administrator'),
+      createdAt: now,
+      lastActivity: now
+    });
+
+    const secure = requestIsSecure(req) ? '; Secure' : '';
+    res.set('Set-Cookie', `doctor_setup_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${secure}`);
+    audit.record({ requestId: req.requestId, action: 'SETUP_ADMIN_LOGIN', actor: username, clientIp: ip, outcome: 'success' });
+    res.json({
+      success: true,
+      token,
+      user: String(user.loginname),
+      displayName: String(user.name || user.loginname),
+      groupname: String(user.groupname || 'Administrator')
+    });
+  } catch (error) {
+    console.error('[setup/auth] Login error:', error.message || error);
+    res.status(500).json({ success: false, error: 'ตรวจสอบสิทธิ์กับ HOSxP ไม่สำเร็จ: ' + (error.message || error) });
+  }
+});
+
+app.post('/api/setup/auth/logout', (req, res) => {
+  const cookie = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith('doctor_setup_session='));
+  const token = cookie ? cookie.slice('doctor_setup_session='.length) : (req.get('x-setup-token') || '');
+  if (token) setupAdminSessions.delete(token);
+  res.set('Set-Cookie', 'doctor_setup_session=; Path=/; HttpOnly; Max-Age=0');
+  res.json({ success: true });
+});
+
+app.get('/api/setup/auth/session', (req, res) => {
+  const config = db.getConfig();
+  const session = getSetupAdminSession(req);
+  const isLocalClient = isLocal(req) && !req.get('x-forwarded-for');
   res.json({
     configured: !!config,
+    authenticated: Boolean(session || isLocalClient || !config),
+    isLocal: isLocalClient,
+    adminUser: session ? session.user : (isLocalClient ? 'server-console' : null),
+    displayName: session ? session.displayName : (isLocalClient ? 'ผู้ดูแลระบบ (Server Console)' : null),
+    groupname: session ? session.groupname : null
+  });
+});
+
+app.get('/api/setup/status', (req, res) => {
+  const config = db.getConfig();
+  const clientIp = requestClientIp(req);
+  const currentPort = Number(httpServer?.address()?.port) || Number(process.env.PORT) || 3030;
+  const session = getSetupAdminSession(req);
+  const isLocalClient = isLocal(req) && !req.get('x-forwarded-for');
+  const authenticated = Boolean(session || isLocalClient || !config);
+
+  res.json({
+    configured: !!config,
+    authenticated,
     clientIp,
+    currentPort,
     config: config ? {
       port: config.port,
       hospitalName: config.hospitalName || '',
       hospitalCode: config.hospitalCode || '',
-      hosxp: { host: config.hosxp?.host || '', port: config.hosxp?.port || 3306, database: config.hosxp?.database || '', user: config.hosxp?.user || '' },
+      hosxp: authenticated ? {
+        host: config.hosxp?.host || '',
+        port: config.hosxp?.port || 3306,
+        database: config.hosxp?.database || '',
+        user: config.hosxp?.user || ''
+      } : {
+        host: config.hosxp?.host ? '***' : '',
+        port: config.hosxp?.port || 3306,
+        database: config.hosxp?.database || '',
+        user: config.hosxp?.user || ''
+      },
       security: {
         allowedLanSubnets: config.security?.allowedLanSubnets || ['127.0.0.1', '::1'],
         allowInsecureEnrollment: config.security?.allowInsecureEnrollment !== false,
@@ -611,11 +762,23 @@ app.post('/api/setup/save', localSetupOnly, async (req, res) => {
         auditHashKey: old?.security?.auditHashKey || crypto.randomBytes(32).toString('hex')
       },
       schema: {
-        creatinineLabCode: String(body.creatinineLabCode || '155').trim(),
-        searchCharset: ['tis620', 'utf8mb4'].includes(String(body.searchCharset).toLowerCase()) ? String(body.searchCharset).toLowerCase() : 'tis620',
-        labTrendCodes: Object.fromEntries(['ldl', 'hct', 'platelet', 'uacr', 'potassium', 'sodium', 'bun', 'ast', 'alt', 'uric'].map(key => [key,
-          [...new Set(String(body.labTrendCodes?.[key] || '').split(',').map(code => code.trim()).filter(code => /^[A-Za-z0-9._-]{1,30}$/.test(code)))].slice(0, 20)
-        ]))
+        creatinineLabCode: String(body.creatinineLabCode || old?.schema?.creatinineLabCode || '155').trim(),
+        searchCharset: ['tis620', 'utf8mb4'].includes(String(body.searchCharset).toLowerCase()) ? String(body.searchCharset).toLowerCase() : (old?.schema?.searchCharset || 'tis620'),
+        labTrendCodes: (() => {
+          const submitted = body.labTrendCodes || {};
+          const previous = old?.schema?.labTrendCodes || {};
+          const result = {};
+          for (const key of ['ldl', 'hct', 'platelet', 'uacr', 'potassium', 'sodium', 'bun', 'ast', 'alt', 'uric']) {
+            if (submitted[key] !== undefined && String(submitted[key]).trim()) {
+              result[key] = [...new Set(String(submitted[key]).split(',').map(code => code.trim()).filter(code => /^[A-Za-z0-9._-]{1,30}$/.test(code)))].slice(0, 20);
+            } else if (Array.isArray(previous[key]) && previous[key].length > 0) {
+              result[key] = previous[key];
+            } else {
+              result[key] = [];
+            }
+          }
+          return result;
+        })()
       }
     };
     await db.closePool();
@@ -678,8 +841,13 @@ app.get('/install/companion.exe', installNetworkOnly, (req, res) => {
   if (!isLocal(req) && !secureForEnrollment(req)) return res.status(426).send('การติดตั้งจากเครื่องอื่นต้องเปิดผ่าน HTTPS');
   const release = getLatestCompanionRelease();
   if (!release || !fs.existsSync(release.fullPath)) return res.status(404).send('ยังไม่มีไฟล์ Companion สำหรับรุ่นนี้');
+  const reqHost = req.get('host') || `${req.socket.localAddress}:${httpServer?.address()?.port || 3030}`;
+  const cleanHost = reqHost.replace(/[:]/g, '_');
+  const ticket = String(req.query.ticket || '').trim();
+  const ticketPart = ticket ? `_ticket_${ticket}` : '';
+  const downloadName = `DoctorAssistantCompanion_server_${cleanHost}${ticketPart}.exe`;
   res.set('Cache-Control', 'no-store');
-  res.download(release.fullPath, release.name);
+  res.download(release.fullPath, downloadName);
 });
 
 app.use('/install', installNetworkOnly, express.static(path.join(PUBLIC, 'install')));
