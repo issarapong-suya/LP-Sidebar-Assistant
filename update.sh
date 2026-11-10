@@ -20,7 +20,8 @@ SERVER_DIR="$APP_DIR/server"
 
 cd "$APP_DIR"
 echo -e "\n${BLUE}[1/3] ดึงข้อมูลอัปเดตล่าสุดจาก GitHub (git pull)...${NC}"
-git pull origin main
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+git -c safe.directory=* pull origin main
 
 echo -e "\n${BLUE}[2/3] อัปเดต dependencies และสิทธิ์ไฟล์...${NC}"
 cd "$SERVER_DIR"
