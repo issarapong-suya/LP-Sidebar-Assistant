@@ -173,35 +173,56 @@ SHOW GRANTS FOR 'hos_assistant_ro'@'%';
 
 ## 6. ขั้นตอนการติดตั้งบน Linux Server
 
-*(ตัวอย่างคำสั่งสำหรับ Ubuntu 22.04 / 24.04 LTS หรือ Debian 12)*
+*(รองรับ Ubuntu 20.04/22.04/24.04 LTS, Debian 11/12, AlmaLinux 8/9, Rocky Linux 8/9)*
 
-### ขั้นตอนที่ 1: ติดตั้ง Node.js LTS (v20 หรือ v22)
+### วิธีที่ 1 (แนะนำสูงสุด): ติดตั้งอัตโนมัติผ่าน GitHub ด้วยสคริปต์ `install.sh` (คำสั่งเดียวเสร็จสมบูรณ์)
+
+ผู้ดูแลระบบสามารถ Clone และรันตัวติดตั้งอัตโนมัติได้ทันที:
+
 ```bash
-# ติดตั้ง NodeSource Repository สำหรับ Node.js v20 หรือ v22 LTS
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+git clone https://github.com/issarapong-suya/LP-Sidebar-Assistant.git
+cd LP-Sidebar-Assistant
+sudo bash install.sh
+```
+
+**สิ่งที่สคริปต์ `install.sh` ดำเนินการให้อัตโนมัติ:**
+1. ตรวจสอบสภาพแวดล้อมและติดตั้ง Node.js 22 LTS จาก NodeSource ให้อัตโนมัติ (หากยังไม่มี)
+2. รัน `npm install --production` เพื่อติดตั้งโมดูลที่จำเป็น
+3. เตรียมโฟลเดอร์จัดเก็บข้อมูลความปลอดภัย `server/data/` พร้อมตั้งสิทธิ์การเข้าถึง
+4. สร้างและเปิดใช้งาน Systemd Service (`doctor-assistant.service`) ให้เริ่มทำงานอัตโนมัติเมื่อเปิดเครื่อง
+5. ตรวจสอบและเปิดกฎ Firewall พอร์ต `3030` (UFW / Firewalld)
+6. สรุป IP และ URL หน้า Setup เพื่อให้เริ่มตั้งค่าระบบได้ทันที
+
+---
+
+### วิธีที่ 2: ติดตั้งแบบ Manual ทีละขั้นตอน (สำหรับแอดมินที่ต้องการจัดการเอง)
+
+#### ขั้นตอนที่ 1: ติดตั้ง Node.js 22 LTS
+```bash
+# สำหรับ Ubuntu / Debian:
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs git build-essential
 
-# ตรวจสอบเวอร์ชัน
-node -v   # ควรเป็น v20.x หรือ v22.x
+# สำหรับ AlmaLinux / Rocky / CentOS Stream:
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo dnf install -y nodejs git gcc-c++ make
+
+# ตรวจสอบเวอร์ชัน (ต้องเป็น v22.5.0 ขึ้นไป)
+node -v
 npm -v
 ```
 
-### ขั้นตอนที่ 2: วางไฟล์ระบบใน Server
+#### ขั้นตอนที่ 2: Clone ซอร์สโค้ดจาก GitHub
 ```bash
-# ตัวอย่างวางไว้ที่ /opt/doctor-assistant
-sudo mkdir -p /opt/doctor-assistant
-sudo chown -R $USER:$USER /opt/doctor-assistant
-
-# Clone หรือคัดลอกไฟล์โฟลเดอร์โปรเจกต์มาที่นี่
-cd /opt/doctor-assistant
-# (คัดลอกไฟล์โปรเจกต์ทั้งหมดมาลงที่โฟลเดอร์นี้)
-
-# ติดตั้ง Dependencies ของ Server
+# วางไว้ที่ /opt/doctor-assistant
+sudo git clone https://github.com/issarapong-suya/LP-Sidebar-Assistant.git /opt/doctor-assistant
 cd /opt/doctor-assistant/server
-npm install --production
+
+# ติดตั้ง Dependencies
+sudo npm install --production
 ```
 
-### ขั้นตอนที่ 3: ตั้งค่าให้รันเป็น Background Service ด้วย systemd
+#### ขั้นตอนที่ 3: ตั้งค่าให้รันเป็น Background Service ด้วย systemd
 สร้างไฟล์ Service:
 ```bash
 sudo nano /etc/systemd/system/doctor-assistant.service
@@ -248,30 +269,40 @@ sudo systemctl status doctor-assistant
 
 ---
 
-## 7. ขั้นตอนการติดตั้งบน Windows Server
+## 7. ขั้นตอนการติดตั้งบน Windows Server / Windows 10/11
 
-### ขั้นตอนที่ 1: ติดตั้ง Node.js
-1. ดาวน์โหลดและติดตั้ง **Node.js LTS (v20 หรือ v22)** จาก [nodejs.org](https://nodejs.org/) (เลือกไฟล์ `.msi` 64-bit)
-2. วางโฟลเดอร์ระบบไว้ที่ไดรฟ์ที่ต้องการ เช่น `D:\HospitalApps\doctor-assistant`
+*(ต้องการ Node.js 22 LTS ขึ้นไป ดาวน์โหลดได้จาก [nodejs.org](https://nodejs.org/))*
 
-### ขั้นตอนที่ 2: ติดตั้ง Dependencies
-เปิด Command Prompt หรือ PowerShell ในโฟลเดอร์ `server`:
-```powershell
-cd D:\HospitalApps\doctor-assistant\server
-npm install --production
-```
+### วิธีที่ 1 (แนะนำและสะดวกรวดเร็ว): ติดตั้งผ่าน `install-windows.bat`
 
-### ขั้นตอนที่ 3: ติดตั้งเป็น Windows Service ด้วย NSSM (แนะนำ)
-NSSM (Non-Sucking Service Manager) ช่วยให้ Node.js รันเป็น Service ของ Windows อัตโนมัติแม้ไม่มีผู้ใช้ Login:
+1. Clone ซอร์สโค้ดจาก GitHub ไปยังไดรฟ์ที่ต้องการ เช่น `D:\HospitalApps`:
+   ```cmd
+   cd /d D:\HospitalApps
+   git clone https://github.com/issarapong-suya/LP-Sidebar-Assistant.git
+   cd LP-Sidebar-Assistant
+   ```
+2. ดับเบิลคลิกไฟล์ **`install-windows.bat`** (หรือคลิกขวาแล้วเลือก Run as Administrator)
+3. สคริปต์จะทำการ:
+   - ตรวจสอบเวอร์ชัน Node.js
+   - ติดตั้ง dependencies (`npm install --production`)
+   - เปิดกฎ Firewall พอร์ต `3030`
+   - เริ่มต้นเซิร์ฟเวอร์และเปิดหน้าจอ **Setup Wizard** ในบราวเซอร์ให้อัตโนมัติ
+
+---
+
+### วิธีที่ 2: ติดตั้งเป็น Windows Service ระยะยาวด้วย NSSM (ทำงานตลอดเวลาแม้ไม่มีผู้ใช้ล็อกอิน)
+
+NSSM (Non-Sucking Service Manager) ช่วยให้ Node.js รันเป็น Service ของ Windows อัตโนมัติ:
 1. ดาวน์โหลด `nssm.exe` จาก [nssm.cc](https://nssm.cc/) วางไว้ที่ `C:\Windows\System32\`
 2. เปิด PowerShell ในฐานะ Administrator แล้วพิมพ์:
    ```powershell
-   nssm install DoctorAssistantService "C:\Program Files\nodejs\node.exe" "D:\HospitalApps\doctor-assistant\server\server.js"
-   nssm set DoctorAssistantService AppDirectory "D:\HospitalApps\doctor-assistant\server"
+   nssm install DoctorAssistantService "C:\Program Files\nodejs\node.exe" "D:\HospitalApps\LP-Sidebar-Assistant\server\server.js"
+   nssm set DoctorAssistantService AppDirectory "D:\HospitalApps\LP-Sidebar-Assistant\server"
    nssm set DoctorAssistantService Description "Sidebar Doctor Assistant HOSxP Server"
    nssm set DoctorAssistantService Start SERVICE_AUTO_START
    nssm start DoctorAssistantService
    ```
+3. เซอร์วิสจะเริ่มทำงานทันที และเริ่มต้นใหม่อัตโนมัติทุกครั้งที่รีสตาร์ตเครื่อง Server
 3. เซอร์วิสจะเริ่มทำงานทันที และเริ่มใหม่อัตโนมัติทุกครั้งที่รีสตาร์ตเครื่อง Server
 
 ---

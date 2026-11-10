@@ -9,7 +9,9 @@ server/npm-debug.log*
 # Workstation configuration and generated builds
 companion/config.json
 companion/build/
-companion/dist/
+companion/dist/*
+!companion/dist/config.json
+!companion/dist/DoctorAssistantCompanion_v1_build20261109.01.exe
 companion/__pycache__/
 companion/*.log
 companion/*.exe
