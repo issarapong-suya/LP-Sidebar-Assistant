@@ -22,9 +22,14 @@ cd "$APP_DIR"
 echo -e "\n${BLUE}[1/3] ดึงข้อมูลอัปเดตล่าสุดจาก GitHub (git pull)...${NC}"
 git pull origin main
 
-echo -e "\n${BLUE}[2/3] อัปเดต dependencies...${NC}"
+echo -e "\n${BLUE}[2/3] อัปเดต dependencies และสิทธิ์ไฟล์...${NC}"
 cd "$SERVER_DIR"
 npm install --production --no-audit --no-fund
+SERVICE_USER="www-data"
+if id "$SERVICE_USER" >/dev/null 2>&1; then
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" || true
+  chmod 775 "$SERVER_DIR" || true
+fi
 
 echo -e "\n${BLUE}[3/3] รีสตาร์ต Service...${NC}"
 if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet doctor-assistant.service; then

@@ -104,7 +104,9 @@ if ! id "$SERVICE_USER" >/dev/null 2>&1; then
     SERVICE_USER="root"
   fi
 fi
-chown -R "$SERVICE_USER:$SERVICE_USER" "$SERVER_DIR/data" || true
+chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR" || true
+chmod 775 "$SERVER_DIR" || true
+chmod 775 "$SERVER_DIR/data" || true
 
 # 5. สร้าง systemd Service
 echo -e "\n${BLUE}[3/5] ตั้งค่าและสร้าง systemd Service (doctor-assistant.service)...${NC}"
