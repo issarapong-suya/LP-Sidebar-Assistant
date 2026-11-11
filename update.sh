@@ -22,7 +22,11 @@ cd "$APP_DIR"
 echo -e "\n${BLUE}[1/3] ดึงข้อมูลอัปเดตล่าสุดจาก GitHub (git pull)...${NC}"
 git config --system --add safe.directory "$APP_DIR" 2>/dev/null || true
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
-git -c safe.directory=* pull origin main
+# เคลียร์การเปลี่ยนแปลงไฟล์โค้ดในเครื่องเซิร์ฟเวอร์ให้อัตโนมัติ (ไม่แตะต้อง config.json หรือ data)
+git -c safe.directory=* checkout -- . 2>/dev/null || true
+# ดึงและอัปเดตโค้ดล่าสุดจาก origin main
+git -c safe.directory=* fetch origin main 2>/dev/null || true
+git -c safe.directory=* reset --hard origin/main 2>/dev/null || git -c safe.directory=* pull origin main
 
 echo -e "\n${BLUE}[2/3] อัปเดต dependencies และสิทธิ์ไฟล์...${NC}"
 cd "$SERVER_DIR"
