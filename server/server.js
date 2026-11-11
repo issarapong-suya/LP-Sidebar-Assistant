@@ -858,8 +858,8 @@ app.use('/api', (req, res, next) => {
     audit.record({ requestId: req.requestId, action: 'API_ACCESS_DENIED', clientIp: requestClientIp(req), outcome: 'denied' });
     return res.status(403).json({ success: false, error: 'เครื่องนี้ไม่ได้อยู่ในวงเครือข่ายที่อนุญาต' });
   }
-  // These endpoints carry Companion's short-lived HOSxP session heartbeat or report the lock state.
-  if (req.path.endsWith('/sync-patient') || req.path.endsWith('/notify-patient') || req.path.endsWith('/version') || req.path.endsWith('/auth/login') || req.path.endsWith('/auth/logout')) return next();
+  // These endpoints carry Companion's short-lived HOSxP session heartbeat, report lock state, or submit feedback.
+  if (req.path.endsWith('/sync-patient') || req.path.endsWith('/notify-patient') || req.path.endsWith('/version') || req.path.endsWith('/auth/login') || req.path.endsWith('/auth/logout') || req.path.endsWith('/feedback')) return next();
   const clientIp = requestClientIp(req);
   const companion = companionSessions.get(clientIp);
   if (companion?.active && Date.now() - companion.timestamp <= 15000) {

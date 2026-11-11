@@ -1,5 +1,9 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+const https = require('https');
 const express = require('express');
 const { getPool, getConfig } = require('../db');
 const auditLog = require('../audit-log');
@@ -1106,6 +1110,111 @@ router.get('/patient-visits/:hn', async (req, res) => {
     if (!audit(req, 'PATIENT_VISIT_HISTORY', { hn: req.params.hn })) return res.status(503).json({ success: false, error: 'ระบบบันทึก audit ไม่พร้อม', visits: [] });
     res.json({ success: true, hn: req.params.hn, count: rows.length, visits: rows.map(row => ({ ...row, vstdate_thai: thaiDate(row.vstdate) })) });
   } catch (error) { auditLog.record({ requestId: req.requestId, action: 'PATIENT_VISIT_HISTORY', actor: req.assistantSession?.user, workstation: req.assistantSession?.computer, clientIp: clientIp(req), resourceType: 'patient', resourceRef: req.params.hn, outcome: 'error' }); res.status(500).json({ success: false, error: 'อ่านรายการ Visit ไม่สำเร็จ', visits: [] }); }
+});
+
+const DEFAULT_FEEDBACK_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwmHqvz6EbE-UrZY68sZV41CQMUhS2mz7QGAlIiWCuErtZoav2y2QhYa4gNWIEleaRy/exec';
+
+function forwardFeedbackToWebhook(webhookUrl, data) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(data);
+    const targetUrl = new URL(webhookUrl);
+    
+    const sendReq = (u, redirects = 0) => {
+      if (redirects > 5) return reject(new Error('Too many redirects'));
+      const transport = u.protocol === 'https:' ? https : http;
+      const request = transport.request(u, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        timeout: 9000
+      }, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const nextUrl = new URL(response.headers.location, u);
+          const getTransport = nextUrl.protocol === 'https:' ? https : http;
+          getTransport.get(nextUrl, { timeout: 9000 }, (rRes) => {
+            let b = '';
+            rRes.on('data', chunk => b += chunk);
+            rRes.on('end', () => resolve({ status: rRes.statusCode, body: b }));
+          }).on('error', reject);
+          return;
+        }
+        let b = '';
+        response.on('data', chunk => b += chunk);
+        response.on('end', () => resolve({ status: response.statusCode, body: b }));
+      });
+      request.on('error', reject);
+      request.on('timeout', () => { request.destroy(); reject(new Error('Webhook request timed out')); });
+      request.write(postData);
+      request.end();
+    };
+
+    sendReq(targetUrl);
+  });
+}
+
+router.post('/feedback', express.json({ limit: '64kb' }), async (req, res) => {
+  const ip = clientIp(req);
+  const body = req.body || {};
+  const config = getConfig();
+
+  const message = String(body.message || '').trim();
+  if (!message) {
+    return res.status(400).json({ success: false, error: 'กรุณากรอกข้อความรายละเอียด' });
+  }
+
+  const feedbackData = {
+    timestamp: new Date().toISOString(),
+    hospital: body.hospital || config?.hospital?.name || config?.hospitalName || 'ไม่ระบุโรงพยาบาล',
+    category: String(body.category || 'ทั่วไป').slice(0, 50),
+    message: message.slice(0, 2000),
+    contact: String(body.contact || '').trim().slice(0, 100),
+    user: req.assistantSession?.user || body.user || 'Guest',
+    version: `${req.app?.get('productVersion') || 'v1'} · Build ${req.app?.get('productBuild') || '20261109.01'}`,
+    currentTab: String(body.currentTab || '').slice(0, 80),
+    clientIp: ip
+  };
+
+  // 1. บันทึกลง local file เสมอเพื่อสำรองข้อมูล
+  try {
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const localFile = path.join(dataDir, 'feedbacks.jsonl');
+    fs.appendFileSync(localFile, JSON.stringify(feedbackData) + '\n', 'utf8');
+  } catch (err) {
+    console.error('[Feedback] Local save error:', err.message);
+  }
+
+  // 2. ส่งต่อไปยัง Webhook
+  const webhookUrl = process.env.FEEDBACK_WEBHOOK_URL || config?.feedbackWebhookUrl || DEFAULT_FEEDBACK_WEBHOOK_URL;
+  let webhookSuccess = false;
+  let webhookError = null;
+
+  if (webhookUrl) {
+    try {
+      await forwardFeedbackToWebhook(webhookUrl, feedbackData);
+      webhookSuccess = true;
+    } catch (whErr) {
+      webhookError = whErr.message;
+      console.error('[Feedback] Webhook forward error:', whErr.message);
+    }
+  }
+
+  auditLog.record({
+    requestId: req.requestId,
+    action: 'FEEDBACK_SUBMITTED',
+    actor: feedbackData.user,
+    clientIp: ip,
+    outcome: 'success'
+  });
+
+  return res.json({
+    success: true,
+    message: 'ส่งข้อเสนอแนะเรียบร้อยแล้ว ขอบคุณสำหรับคำแนะนำครับ',
+    webhookDelivered: webhookSuccess,
+    note: webhookError ? 'บันทึกในเซิร์ฟเวอร์เรียบร้อย' : undefined
+  });
 });
 
 module.exports = router;

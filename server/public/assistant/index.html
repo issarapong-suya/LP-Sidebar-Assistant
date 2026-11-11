@@ -50,6 +50,7 @@
           <span class="sync-dot"></span>
           <span id="syncStatusText">ซิงค์อัตโนมัติ</span>
         </div>
+        <button type="button" class="btn-feedback-trigger" id="btnOpenFeedbackHeader" title="ส่งข้อเสนอแนะหรือแจ้งปัญหาถึงผู้พัฒนาระบบ">💬 แจ้งปัญหา</button>
         <button type="button" class="btn-session-logout" id="btnSessionLogout" hidden>ออกจากระบบ</button>
       </div>
     </div>
@@ -547,7 +548,11 @@
   <!-- ─── Floating Tooltip Container สไตล์ Modern Slate ─── -->
   <div id="appFloatingTooltip" class="app-floating-tooltip"></div>
 
-  <footer class="privacy-footer"><button type="button" id="openPrivacyPolicy">นโยบายข้อมูลผู้ป่วย · PDPA</button><span id="footerBuild">Sidebar Doctor Assistant v1</span></footer>
+  <footer class="privacy-footer">
+    <button type="button" id="openPrivacyPolicy">นโยบายข้อมูลผู้ป่วย · PDPA</button>
+    <button type="button" id="openFeedbackFooter" class="btn-footer-feedback">💬 ส่งข้อเสนอแนะ</button>
+    <span id="footerBuild">Sidebar Doctor Assistant v1</span>
+  </footer>
   <div class="privacy-modal" id="privacyPolicyModal" role="dialog" aria-modal="true" aria-labelledby="privacyPolicyTitle" hidden>
     <div class="privacy-modal-card"><button type="button" id="closePrivacyPolicy" class="privacy-close" aria-label="ปิด">×</button>
       <h2 id="privacyPolicyTitle">การใช้และดูแลข้อมูลในระบบนี้</h2>
@@ -555,6 +560,56 @@
       <p>เมื่อเข้าสู่ระบบโดยไม่เปิด HOSxP ระบบตรวจบัญชีผู้ใช้กับตาราง opduser ผ่าน passweb ข้อมูลรหัสผ่านที่กรอกใช้เพื่อตรวจสอบและไม่ถูกบันทึกเป็นข้อมูลบัญชีใน Sidebar เมื่อระบบพบ session จาก HOSxP/Companion จะออกจาก manual session และเปลี่ยนไปใช้ผู้ใช้กับคนไข้ที่เลือกใน HOSxP ผู้ใช้ควรออกจากระบบเมื่อเลิกใช้งาน และไม่ใช้บัญชีร่วมกัน</p>
       <p>ระบบบันทึกเหตุการณ์เข้าใช้ ค้นหา เปิดดูข้อมูล และออกจากระบบ พร้อมบัญชีผู้ใช้ เครื่อง และ IP โดยแทน HN/VN ใน audit log ด้วยรหัสอ้างอิงที่ผ่าน HMAC ไฟล์ audit จัดเก็บใน SQLite บนเครื่อง Server และมี JSONL สำรองเมื่อ SQLite เขียนไม่ได้ ข้อมูลผู้ป่วยที่กำลังแสดงใช้ในหน่วยความจำระหว่างทำงาน ระบบนี้ไม่ส่งข้อมูลให้ AI หรือบริการภายนอก</p>
       <p>การเชื่อมต่อจากเครื่องอื่นต้องใช้ HTTPS ผู้ดูแลระบบโรงพยาบาลเป็นผู้กำหนดสิทธิ์เข้าถึงระบบ การสำรอง และระยะเวลาเก็บ audit log ให้สอดคล้องกับนโยบายของโรงพยาบาล หากพบการใช้ข้อมูลผิดวัตถุประสงค์ โปรดแจ้งผู้ดูแลระบบหรือเจ้าหน้าที่คุ้มครองข้อมูลของโรงพยาบาล</p>
+    </div>
+  </div>
+
+  <!-- ─── Feedback Modal: แจ้งปัญหาและข้อเสนอแนะ ─── -->
+  <div class="feedback-modal" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle" hidden>
+    <div class="feedback-modal-card">
+      <div class="feedback-modal-header">
+        <div class="feedback-title-wrap">
+          <span class="feedback-icon">💬</span>
+          <h2 id="feedbackTitle">ส่งข้อเสนอแนะ / แจ้งปัญหา</h2>
+        </div>
+        <button type="button" id="closeFeedbackModal" class="feedback-close" aria-label="ปิด">×</button>
+      </div>
+
+      <form id="feedbackForm" class="feedback-form">
+        <div class="feedback-field">
+          <label for="feedbackCategory">ประเภทเรื่อง</label>
+          <select id="feedbackCategory" required>
+            <option value="🐞 แจ้งปัญหา / ข้อผิดพลาด">🐞 แจ้งปัญหา / ข้อผิดพลาด</option>
+            <option value="💡 ข้อเสนอแนะ / ปรับปรุง">💡 ข้อเสนอแนะ / ปรับปรุง</option>
+            <option value="🧪 ข้อมูล Lab หรือยาไม่ตรงกับ HOSxP">🧪 ข้อมูล Lab หรือยาไม่ตรงกับ HOSxP</option>
+            <option value="❓ สอบถามการใช้งาน">❓ สอบถามการใช้งาน</option>
+            <option value="📝 อื่นๆ">📝 อื่นๆ</option>
+          </select>
+        </div>
+
+        <div class="feedback-field">
+          <label for="feedbackMessage">รายละเอียด <span class="required-mark">*</span></label>
+          <textarea id="feedbackMessage" rows="3" placeholder="ระบุสิ่งที่พบ ข้อผิดพลาด หรือข้อเสนอแนะที่ต้องการให้ปรับปรุง..." required></textarea>
+        </div>
+
+        <div class="feedback-field">
+          <label for="feedbackContact">ชื่อผู้แจ้ง / ช่องทางติดต่อกลับ (ถ้ามี)</label>
+          <input type="text" id="feedbackContact" placeholder="เช่น นพ.สมชาย / เบอร์ต่อ 101">
+        </div>
+
+        <div class="feedback-context-box">
+          <div class="feedback-context-title">ข้อมูลระบบที่จะแนบไปพร้อมรายงานอัตโนมัติ:</div>
+          <div class="feedback-context-badge" id="feedbackContextBadge">กำลังดึงข้อมูล...</div>
+        </div>
+
+        <div class="feedback-alert" id="feedbackAlert" hidden></div>
+
+        <div class="feedback-actions">
+          <button type="button" id="btnCancelFeedback" class="btn-feedback-cancel">ยกเลิก</button>
+          <button type="submit" id="btnSubmitFeedback" class="btn-feedback-submit">
+            <span id="btnFeedbackText">ส่งข้อเสนอแนะ</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

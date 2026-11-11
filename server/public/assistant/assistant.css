@@ -3145,3 +3145,258 @@ body.session-locked>:not(#sessionLockOverlay){display:none!important}
   border-color: #94a3b8;
   color: #0f172a;
 }
+
+/* ─── Feedback System (Button & Modal) ─── */
+.btn-feedback-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-feedback-trigger:hover {
+  background: #ccfbf1;
+  border-color: #5eead4;
+  color: #115e59;
+  transform: translateY(-1px);
+}
+
+.btn-footer-feedback {
+  background: none;
+  border: none;
+  color: #0f766e;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+.btn-footer-feedback:hover {
+  color: #115e59;
+}
+
+.feedback-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.feedback-modal[hidden] {
+  display: none !important;
+}
+
+.feedback-modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feedback-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.feedback-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feedback-icon {
+  font-size: 18px;
+}
+
+.feedback-modal-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.feedback-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #94a3b8;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.feedback-close:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+
+.feedback-form {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.feedback-field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.required-mark {
+  color: #ef4444;
+}
+
+.feedback-field select,
+.feedback-field input[type="text"],
+.feedback-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.feedback-field select:focus,
+.feedback-field input[type="text"]:focus,
+.feedback-field textarea:focus {
+  outline: none;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+}
+
+.feedback-field textarea {
+  resize: vertical;
+  min-height: 70px;
+  line-height: 1.45;
+}
+
+.feedback-context-box {
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.feedback-context-title {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.feedback-context-badge {
+  font-size: 11px;
+  color: #0f766e;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.feedback-alert {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.feedback-alert.success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.feedback-alert.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-feedback-cancel {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-feedback-cancel:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.btn-feedback-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0f766e;
+  border: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+  transition: all 0.15s;
+}
+
+.btn-feedback-submit:hover:not(:disabled) {
+  background: #115e59;
+  transform: translateY(-1px);
+}
+
+.btn-feedback-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

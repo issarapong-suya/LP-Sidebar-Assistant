@@ -534,6 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { setAssistantSessionActive(false); }
   });
   setupAudioAlerts();
+  setupFeedbackModal();
   const urlParams = new URLSearchParams(window.location.search);
   const qVn = urlParams.get('vn');
   const qHn = urlParams.get('hn');
@@ -4293,6 +4294,111 @@ function setupVisitPicker() {
   document.addEventListener('click', (e) => {
     if (dropdown && !dropdown.contains(e.target) && e.target !== btnSelect) {
       dropdown.style.display = 'none';
+    }
+  });
+}
+
+function setupFeedbackModal() {
+  const modal = document.getElementById('feedbackModal');
+  const btnHeader = document.getElementById('btnOpenFeedbackHeader');
+  const btnFooter = document.getElementById('openFeedbackFooter');
+  const btnClose = document.getElementById('closeFeedbackModal');
+  const btnCancel = document.getElementById('btnCancelFeedback');
+  const form = document.getElementById('feedbackForm');
+  const alertBox = document.getElementById('feedbackAlert');
+  const contextBadge = document.getElementById('feedbackContextBadge');
+  const contactInput = document.getElementById('feedbackContact');
+  const messageInput = document.getElementById('feedbackMessage');
+  const categorySelect = document.getElementById('feedbackCategory');
+  const submitBtn = document.getElementById('btnSubmitFeedback');
+  const btnText = document.getElementById('btnFeedbackText');
+
+  if (!modal) return;
+
+  function getActiveTabName() {
+    const activeChip = document.querySelector('.timeline-nav-btn.active, .sub-tab-btn.active, .nav-btn.active');
+    if (activeChip) return activeChip.textContent.trim();
+    return 'หน้าหลัก';
+  }
+
+  function openModal() {
+    modal.hidden = false;
+    alertBox.hidden = true;
+    alertBox.className = 'feedback-alert';
+    alertBox.textContent = '';
+    messageInput.value = '';
+
+    // ดึงชื่อแพทย์หรือผู้ใช้หากมี session
+    const currentUser = (currentPatient && currentPatient.user) || '';
+    if (!contactInput.value && currentUser) {
+      contactInput.value = currentUser;
+    }
+
+    // สร้างข้อมูล Context อัตโนมัติ
+    const activeTab = getActiveTabName();
+    const buildInfo = document.getElementById('footerBuild')?.textContent || 'v1';
+    const patientInfo = currentHn ? `เคส HN: ${currentHn}` : 'ไม่มีเคสเปิดค้าง';
+    contextBadge.textContent = `${buildInfo} · หน้า: ${activeTab} · ${patientInfo}`;
+
+    messageInput.focus();
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+  }
+
+  btnHeader?.addEventListener('click', openModal);
+  btnFooter?.addEventListener('click', openModal);
+  btnClose?.addEventListener('click', closeModal);
+  btnCancel?.addEventListener('click', closeModal);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = messageInput.value.trim();
+    if (!message) return;
+
+    alertBox.hidden = true;
+    submitBtn.disabled = true;
+    btnText.textContent = 'กำลังส่ง...';
+
+    const payload = {
+      category: categorySelect.value,
+      message: message,
+      contact: contactInput.value.trim(),
+      user: (currentPatient && currentPatient.user) || '',
+      currentTab: getActiveTabName(),
+      hn: currentHn || ''
+    };
+
+    try {
+      const resp = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'ส่งข้อเสนอแนะไม่สำเร็จ');
+      }
+
+      alertBox.hidden = false;
+      alertBox.className = 'feedback-alert success';
+      alertBox.textContent = '✅ ' + (data.message || 'ส่งข้อเสนอแนะเรียบร้อยแล้ว ขอบคุณสำหรับคำแนะนำครับ!');
+
+      setTimeout(() => {
+        closeModal();
+      }, 1800);
+    } catch (err) {
+      alertBox.hidden = false;
+      alertBox.className = 'feedback-alert error';
+      alertBox.textContent = '❌ ' + (err.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
+    } finally {
+      submitBtn.disabled = false;
+      btnText.textContent = 'ส่งข้อเสนอแนะ';
     }
   });
 }
