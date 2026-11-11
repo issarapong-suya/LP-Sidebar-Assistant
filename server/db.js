@@ -56,7 +56,7 @@ async function testConnection(settings) {
     } catch (_) { /* CURRENT_ROLE is not available on every MySQL/MariaDB version. */ }
     const [grantRows] = await connection.query('SHOW GRANTS');
     const grants = grantRows.map(row => String(Object.values(row)[0] || ''));
-    const grantCheck = inspectReadOnlyGrants(grants);
+    const grantCheck = inspectReadOnlyGrants(grants, settings.database);
     if (!grantCheck.readOnly) {
       const error = new Error(grantCheck.reason);
       error.grantCheck = { grants, ...grantCheck, identity: identityRows[0] || {}, activeRole };
@@ -73,24 +73,75 @@ async function testConnection(settings) {
   }
 }
 
-function inspectReadOnlyGrants(grants) {
-  if (!grants.length) return { readOnly: false, reason: 'ฐานข้อมูลไม่ส่งข้อมูลสิทธิ์ SHOW GRANTS กลับมา' };
+function inspectReadOnlyGrants(grants, targetDatabase = '') {
+  if (!grants || !grants.length) return { readOnly: false, reason: 'ฐานข้อมูลไม่ส่งข้อมูลสิทธิ์ SHOW GRANTS กลับมา' };
+  
+  const targetDbClean = String(targetDatabase || '').replace(/[`']/g, '').trim().toLowerCase();
+  const writePrivRegex = /\b(ALL(\s+PRIVILEGES)?|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|SUPER|GRANT|FILE)\b/i;
+  const safePrivsRegex = /^(USAGE|SELECT(\s*,\s*SHOW\s+VIEW)?|SHOW\s+VIEW)$/i;
+
   for (const grant of grants) {
     const line = grant.trim();
-    if (/\bWITH\s+GRANT\s+OPTION\b/i.test(line)) return { readOnly: false, reason: 'บัญชีมี WITH GRANT OPTION ซึ่งเกินสิทธิ์อ่านอย่างเดียว' };
-    const match = line.match(/^GRANT\s+(.+?)\s+ON\s+(.+?)\s+TO\s+/i);
+    if (!line) continue;
+    if (/\bWITH\s+GRANT\s+OPTION\b/i.test(line)) {
+      return { readOnly: false, reason: 'บัญชีมี WITH GRANT OPTION ซึ่งเกินสิทธิ์อ่านอย่างเดียว' };
+    }
+
+    const match = line.match(/^GRANT\s+(.+?)\s+ON\s+(.+?)\s+TO\s+(.+)$/i);
     if (!match) {
       // Role grants and nonstandard grant formats cannot be proven SELECT-only here.
-      if (!/^GRANT\s+USAGE\s+ON\s+\*\.\*/i.test(line)) return { readOnly: false, reason: 'พบสิทธิ์แบบ role หรือรูปแบบที่ระบบตรวจสอบ SELECT-only ไม่ได้' };
+      if (!/^GRANT\s+USAGE\s+ON\s+\*\.\*/i.test(line)) {
+        return { readOnly: false, reason: 'พบสิทธิ์แบบ role หรือรูปแบบที่ระบบตรวจสอบ SELECT-only ไม่ได้' };
+      }
       continue;
     }
+
     const privileges = match[1].trim();
-    const scope = match[2].replace(/[`']/g, '').trim();
-    if (/^USAGE$/i.test(privileges) && scope === '*.*') continue;
-    if (!/^SELECT$/i.test(privileges)) return { readOnly: false, reason: `พบบัญชีสิทธิ์อื่นนอกจาก SELECT: ${privileges}` };
-    // SELECT on other schemas is acceptable for the hospital's shared service account.
-    // Keep the security boundary on privilege type: never permit writes or grant option.
+    const rawScope = match[2].trim();
+    const cleanScope = rawScope.replace(/[`']/g, '').replace(/\\_/g, '_');
+    const grantee = match[3].replace(/[`']/g, '').trim();
+
+    // 1. ข้ามสิทธิ์ของฐานข้อมูล test หรือ test\_% ที่ MariaDB/MySQL สร้างเป็นค่าเริ่มต้นและมอบให้ PUBLIC หรือ anonymous
+    const scopeDb = cleanScope.split('.')[0].toLowerCase();
+    const isTestDb = scopeDb === 'test' || scopeDb.startsWith('test_') || scopeDb === 'test%';
+    if (isTestDb && targetDbClean !== 'test' && !targetDbClean.startsWith('test_')) {
+      continue;
+    }
+
+    // 2. ข้าม USAGE ON *.*
+    if (/^USAGE$/i.test(privileges) && cleanScope === '*.*') {
+      continue;
+    }
+
+    // 3. ตรวจสอบระดับ Global (*.*) ต้องไม่มีสิทธิ์เขียน และต้องเป็นสิทธิ์อ่านอย่างเดียว
+    if (cleanScope === '*.*') {
+      if (writePrivRegex.test(privileges)) {
+        return { readOnly: false, reason: `พบบัญชีสิทธิ์เขียนระดับ Global (*.*): ${privileges}` };
+      }
+      if (!safePrivsRegex.test(privileges)) {
+        return { readOnly: false, reason: `พบบัญชีสิทธิ์ Global อื่นนอกจาก SELECT: ${privileges}` };
+      }
+      continue;
+    }
+
+    // 4. ตรวจสอบระดับฐานข้อมูล HOSxP เป้าหมาย (targetDatabase)
+    const isTargetDb = !targetDbClean || scopeDb === targetDbClean;
+    if (isTargetDb) {
+      if (writePrivRegex.test(privileges)) {
+        return { readOnly: false, reason: `พบบัญชีสิทธิ์เขียนบนฐานข้อมูล ${targetDatabase || cleanScope}: ${privileges}` };
+      }
+      if (!safePrivsRegex.test(privileges)) {
+        return { readOnly: false, reason: `พบบัญชีสิทธิ์อื่นนอกจาก SELECT บนฐานข้อมูล ${targetDatabase || cleanScope}: ${privileges}` };
+      }
+      continue;
+    }
+
+    // 5. หากมีสิทธิ์บนฐานข้อมูลอื่น (Cross-database) ต้องไม่มีสิทธิ์เขียนเช่นกัน
+    if (writePrivRegex.test(privileges)) {
+      return { readOnly: false, reason: `พบบัญชีสิทธิ์เขียนบนฐานข้อมูล ${cleanScope}: ${privileges}` };
+    }
   }
+
   return { readOnly: true, reason: '' };
 }
 
