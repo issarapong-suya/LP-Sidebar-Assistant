@@ -34,6 +34,7 @@ let audioEnabled = true;
 let assistantSessionActive = false;
 let lastSessionHeartbeatAt = 0;
 let assistantAuthMode = '';
+let assistantSessionUser = '';
 
 function setAssistantSessionActive(active, user = '', authMode = '') {
   const wasActive = assistantSessionActive;
@@ -41,6 +42,7 @@ function setAssistantSessionActive(active, user = '', authMode = '') {
   const locked = !active;
   assistantSessionActive = !!active;
   assistantAuthMode = active ? authMode : '';
+  assistantSessionUser = active ? String(user || '') : '';
   document.body.classList.toggle('session-locked', locked);
   const overlay = document.getElementById('sessionLockOverlay');
   const message = document.getElementById('sessionLockMessage');
@@ -48,6 +50,7 @@ function setAssistantSessionActive(active, user = '', authMode = '') {
   const logoutButton = document.getElementById('btnSessionLogout');
   if (logoutButton) logoutButton.hidden = !(active && authMode === 'manual');
   if (locked) {
+    assistantSessionUser = '';
     currentVn = null; currentHn = null; currentPatientName = ''; currentPatientData = null; currentPatientMeds = [];
     currentLiveDiag = ''; lastHosxpVn = null; isManualSearchActive = false;
     const name = document.getElementById('patientName'); if (name) name.textContent = 'รอคนไข้จาก HOSxP...';
@@ -4322,25 +4325,31 @@ function setupFeedbackModal() {
   }
 
   function openModal() {
-    modal.hidden = false;
-    alertBox.hidden = true;
-    alertBox.className = 'feedback-alert';
-    alertBox.textContent = '';
-    messageInput.value = '';
+    try {
+      modal.hidden = false;
+      alertBox.hidden = true;
+      alertBox.className = 'feedback-alert';
+      alertBox.textContent = '';
+      messageInput.value = '';
 
-    // ดึงชื่อแพทย์หรือผู้ใช้หากมี session
-    const currentUser = (currentPatient && currentPatient.user) || '';
-    if (!contactInput.value && currentUser) {
-      contactInput.value = currentUser;
+      // ดึงชื่อแพทย์หรือผู้ใช้หากมี session
+      if (!contactInput.value && assistantSessionUser) {
+        contactInput.value = assistantSessionUser;
+      }
+
+      // สร้างข้อมูล Context อัตโนมัติ
+      const activeTab = getActiveTabName();
+      const buildInfo = document.getElementById('footerBuild')?.textContent || 'Sidebar Doctor Assistant';
+      const patientInfo = currentHn ? `เคส HN: ${currentHn}` : 'ไม่มีเคสเปิดค้าง';
+      if (contextBadge) {
+        contextBadge.textContent = `${buildInfo} · หน้า: ${activeTab} · ${patientInfo}`;
+      }
+
+      messageInput.focus();
+    } catch (e) {
+      console.error('[Feedback] openModal error:', e);
+      if (contextBadge) contextBadge.textContent = 'Sidebar Doctor Assistant';
     }
-
-    // สร้างข้อมูล Context อัตโนมัติ
-    const activeTab = getActiveTabName();
-    const buildInfo = document.getElementById('footerBuild')?.textContent || 'v1';
-    const patientInfo = currentHn ? `เคส HN: ${currentHn}` : 'ไม่มีเคสเปิดค้าง';
-    contextBadge.textContent = `${buildInfo} · หน้า: ${activeTab} · ${patientInfo}`;
-
-    messageInput.focus();
   }
 
   function closeModal() {
@@ -4365,16 +4374,16 @@ function setupFeedbackModal() {
     submitBtn.disabled = true;
     btnText.textContent = 'กำลังส่ง...';
 
-    const payload = {
-      category: categorySelect.value,
-      message: message,
-      contact: contactInput.value.trim(),
-      user: (currentPatient && currentPatient.user) || '',
-      currentTab: getActiveTabName(),
-      hn: currentHn || ''
-    };
-
     try {
+      const payload = {
+        category: categorySelect.value,
+        message: message,
+        contact: contactInput.value.trim(),
+        user: assistantSessionUser || '',
+        currentTab: getActiveTabName(),
+        hn: currentHn || ''
+      };
+
       const resp = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
