@@ -19,14 +19,13 @@ flowchart TD
         Actions["ตัวควบคุมการคลิกและการตั้งค่า"]
     end
     
-    subgraph SidebarApp["🩺 โปรเจกต์ LP-Sidebar-Assistant (Port 3031)"]
+    subgraph SidebarApp["🩺 โปรเจกต์ LP-Sidebar-Assistant (Port 3030)"]
         Sidebar["Sidebar Doctor Assistant CDS (eGFR CKD-EPI, CrCl, Lab Alert)"]
     end
 
     DB_HOSxP[(ฐานข้อมูล HOSxP V3 - MariaDB)]
 
     HOSxP --> Scanner
-    HOSxP --> F9
     Scanner --> Actions
     
     Actions -- "คลิกเดียว (Single Click)" --> Sidebar
