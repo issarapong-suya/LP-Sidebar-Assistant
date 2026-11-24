@@ -30,7 +30,6 @@ flowchart TD
     Scanner --> Actions
     
     Actions -- "คลิกเดียว (Single Click)" --> Sidebar
-    F9 -- "กด F9 บันทึกตรวจ" --> Writer
     
     Sidebar -- "อ่านอย่างเดียว (SELECT)" --> DB_HOSxP
 ```
