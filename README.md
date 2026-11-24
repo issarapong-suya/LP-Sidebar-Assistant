@@ -16,13 +16,7 @@ flowchart TD
     
     subgraph Companion["🩺 ไอคอนพี่หมอ (Single Companion Controller)"]
         Scanner["Zero-Touch Win32 VCL Hook (สแกน VN/HN)"]
-        F9["Doctor Save Detector (ตรวจจับ F9)"]
         Actions["ตัวควบคุมการคลิกและการตั้งค่า"]
-    end
-    
-    subgraph ReaHOSxi["📄 โปรเจกต์ Rea HOSxi (Port 3030)"]
-        Viewer["OPD Paperless Web Viewer (เปิดดูประวัติย้อนหลัง 188 ตาราง)"]
-        Writer["Doctor Clinical Canvas A4 (ผืนผ้าใบวาดเขียน + สแตมป์ 16 มุมมอง)"]
     end
     
     subgraph SidebarApp["🩺 โปรเจกต์ LP-Sidebar-Assistant (Port 3031)"]
@@ -30,34 +24,25 @@ flowchart TD
     end
 
     DB_HOSxP[(ฐานข้อมูล HOSxP V3 - MariaDB)]
-    DB_Scan[(ฐานข้อมูล Paperless - antdb_scan)]
 
     HOSxP --> Scanner
     HOSxP --> F9
     Scanner --> Actions
     
-    Actions -- "คลิกเดียว (Single Click)" --> Viewer
-    Actions -- "ดับเบิ้ลคลิก (Double Click)" --> Sidebar
+    Actions -- "คลิกเดียว (Single Click)" --> Sidebar
     F9 -- "กด F9 บันทึกตรวจ" --> Writer
     
-    Viewer -- "ปุ่มลัด 🩺 ผู้ช่วยแพทย์" --> Sidebar
-    Writer -- "ปุ่มลัด 🩺 ผู้ช่วยแพทย์" --> Sidebar
-    
     Sidebar -- "อ่านอย่างเดียว (SELECT)" --> DB_HOSxP
-    Writer -- "บันทึก PDF A4" --> DB_Scan
 ```
 
 ### รูปแบบการทำงานร่วมกับระบบเวชระเบียน (Rea HOSxi):
 1. **แยกอิสระ (Decoupled Repository):**
-   * **Rea HOSxi:** จัดการเวชระเบียนผู้ป่วยนอกดิจิทัล (OPD Paperless Web Viewer v2.2.0 และ Doctor Clinical Canvas A4 Writer v2.4.0) รันที่พอร์ต `3030`
-   * **LP-Sidebar-Assistant:** บริการสนับสนุนการตัดสินใจทางคลินิก (CDS) รันที่พอร์ต `3031` (URL: `http://<server>:3031/assistant/`)
+   * **LP-Sidebar-Assistant:** บริการสนับสนุนการตัดสินใจทางคลินิก (CDS) รันที่พอร์ต `3030` (URL: `http://<server>:3030/assistant/`)
 2. **รวมศูนย์ควบคุมผ่าน "ไอคอนพี่หมอ" (Unified Companion Orchestrator):**
    * แพทย์มีไอคอนพี่หมอเพียงตัวเดียวบนหน้าจอ
-   * **คลิกเดียว (Single Click):** เปิดดู OPD Card เก่าย้อนหลัง (Rea HOSxi Viewer)
-   * **ดับเบิ้ลคลิก (Double Click):** เปิด/ดึงแถบ Sidebar Doctor Assistant (กว้าง 520px ชิดขวาหน้าต่าง HOSxP)
-   * **กด F9 บันทึกตรวจ:** ตรวจจับอัตโนมัติแล้วเปิดหน้าเขียนเวชระเบียน Doctor Clinical Canvas A4
-   * **เมนูคลิกขวา:** สลับเปิด/ปิดใช้งาน Sidebar Assistant และตั้งค่า URL เซิร์ฟเวอร์ได้อิสระ
-3. **การเรียกใช้ข้ามระบบในหน้าเว็บ:** ทั้งหน้า Web Viewer และหน้าจอเขียน A4 มีปุ่มลัด **"🩺 ผู้ช่วยแพทย์"** ในแถบเครื่องมือสำหรับคลิกเปิด Sidebar Assistant ของคนไข้รายนั้นได้ทันที
+   * **คลิกเดียว (Single Click):** เปิด/ดึงแถบ Sidebar Doctor Assistant (กว้าง 520px ชิดขวาหน้าต่าง HOSxP)
+   * **เมนูคลิกขวา:** ตั้งค่า URL เซิร์ฟเวอร์ได้อิสระ
+3. **การเรียกใช้ข้ามระบบในหน้าเว็บ:** **"🩺 ผู้ช่วยแพทย์"** ในแถบเครื่องมือสำหรับคลิกเปิด Sidebar Assistant ของคนไข้รายนั้นได้ทันที
 
 ---
 
