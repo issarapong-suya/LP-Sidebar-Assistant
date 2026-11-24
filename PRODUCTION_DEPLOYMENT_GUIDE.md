@@ -220,9 +220,9 @@ npm -v
 
 #### ขั้นตอนที่ 2: Clone ซอร์สโค้ดจาก GitHub
 ```bash
-# วางไว้ที่ /opt/doctor-assistant
-sudo git clone https://github.com/issarapong-suya/LP-Sidebar-Assistant.git /opt/doctor-assistant
-cd /opt/doctor-assistant/server
+# วางไว้ที่ /opt/LP-Sidebar-Assistant
+sudo git clone https://github.com/issarapong-suya/LP-Sidebar-Assistant.git /opt/LP-Sidebar-Assistant
+cd /opt/LP-Sidebar-Assistant/server
 
 # ติดตั้ง Dependencies
 sudo npm install --production
@@ -243,7 +243,7 @@ After=network.target mysql.target
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/opt/doctor-assistant/server
+WorkingDirectory=/opt/LP-Sidebar-Assistant/server
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
@@ -262,7 +262,7 @@ WantedBy=multi-user.target
 เปลี่ยนสิทธิ์โฟลเดอร์และเปิดใช้งาน Service:
 ```bash
 # ให้สิทธิ์ www-data สามารถเขียน config และ audit sqlite ได้
-sudo chown -R www-data:www-data /opt/doctor-assistant/server/data /opt/doctor-assistant/server/config.json 2>/dev/null || true
+sudo chown -R www-data:www-data /opt/LP-Sidebar-Assistant/server/data /opt/LP-Sidebar-Assistant/server/config.json 2>/dev/null || true
 
 # โหลดและเปิดเซอร์วิส
 sudo systemctl daemon-reload
@@ -309,7 +309,6 @@ NSSM (Non-Sucking Service Manager) ช่วยให้ Node.js รันเป
    nssm start DoctorAssistantService
    ```
 3. เซอร์วิสจะเริ่มทำงานทันที และเริ่มต้นใหม่อัตโนมัติทุกครั้งที่รีสตาร์ตเครื่อง Server
-3. เซอร์วิสจะเริ่มทำงานทันที และเริ่มใหม่อัตโนมัติทุกครั้งที่รีสตาร์ตเครื่อง Server
 
 ---
 
