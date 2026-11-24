@@ -6,41 +6,46 @@
 
 ---
 
-## 🏗️ สถาปัตยกรรมการเชื่อมโยงระบบ (Decoupled Multi-Project Architecture)
+## 🏗️ สถาปัตยกรรมระบบ (System Architecture)
 
-ระบบถูกออกแบบโครงสร้างแบบ **Decoupled Architecture (แยกโปรเจกต์อิสระ)** เพื่อประสิทธิภาพและความคล่องตัวในการพัฒนาและบำรุงรักษา:
+ระบบถูกออกแบบโครงสร้างให้ทำงานร่วมกับ HOSxP อย่างราบรื่น โดยรันบริการบนพอร์ตเริ่มต้น **`3030`**:
 
 ```mermaid
 flowchart TD
-    HOSxP["หน้าต่างโปรแกรม HOSxP V3 (ห้องตรวจแพทย์)"]
+    HOSxP["หน้าต่างโปรแกรม HOSxP (ห้องตรวจแพทย์)"]
     
-    subgraph Companion["🩺 ไอคอนพี่หมอ (Single Companion Controller)"]
-        Scanner["Zero-Touch Win32 VCL Hook (สแกน VN/HN)"]
-        Actions["ตัวควบคุมการคลิกและการตั้งค่า"]
+    subgraph Companion["🩺 ไอคอนพี่หมอ (Desktop Companion)"]
+        Scanner["Zero-Touch Scanner (สแกนตรวจจับ VN/HN อัตโนมัติ)"]
+        Actions["ตัวควบคุมการแสดงผลและการตั้งค่า"]
     end
     
-    subgraph SidebarApp["🩺 โปรเจกต์ LP-Sidebar-Assistant (Port 3030)"]
-        Sidebar["Sidebar Doctor Assistant CDS (eGFR CKD-EPI, CrCl, Lab Alert)"]
+    subgraph SidebarApp["🏥 Sidebar Doctor Assistant Server (Port 3030)"]
+        Setup["หน้าตั้งค่าระบบ (/setup/)"]
+        Install["หน้าดาวน์โหลด Companion (/install/)"]
+        Sidebar["Sidebar Doctor Assistant CDS (/assistant/)"]
+        CDS["ระบบสนับสนุนการตัดสินใจทางคลินิก (eGFR, CrCl, Drug Alert, Care Gap)"]
     end
 
-    DB_HOSxP[(ฐานข้อมูล HOSxP V3 - MariaDB)]
+    DB_HOSxP[(ฐานข้อมูล HOSxP - MySQL / MariaDB)]
 
     HOSxP --> Scanner
     Scanner --> Actions
     
-    Actions -- "คลิกเดียว (Single Click)" --> Sidebar
-    
-    Sidebar -- "อ่านอย่างเดียว (SELECT)" --> DB_HOSxP
+    Actions -- "คลิกเปิดแถบผู้ช่วยแพทย์" --> Sidebar
+    Sidebar --> CDS
+    Sidebar -- "อ่านอย่างเดียว 100% (SELECT)" --> DB_HOSxP
 ```
 
-### รูปแบบการทำงานร่วมกับระบบเวชระเบียน (Rea HOSxi):
-1. **แยกอิสระ (Decoupled Repository):**
-   * **LP-Sidebar-Assistant:** บริการสนับสนุนการตัดสินใจทางคลินิก (CDS) รันที่พอร์ต `3030` (URL: `http://<server>:3030/assistant/`)
-2. **รวมศูนย์ควบคุมผ่าน "ไอคอนพี่หมอ" (Unified Companion Orchestrator):**
-   * แพทย์มีไอคอนพี่หมอเพียงตัวเดียวบนหน้าจอ
-   * **คลิกเดียว (Single Click):** เปิด/ดึงแถบ Sidebar Doctor Assistant (กว้าง 520px ชิดขวาหน้าต่าง HOSxP)
-   * **เมนูคลิกขวา:** ตั้งค่า URL เซิร์ฟเวอร์ได้อิสระ
-3. **การเรียกใช้ข้ามระบบในหน้าเว็บ:** **"🩺 ผู้ช่วยแพทย์"** ในแถบเครื่องมือสำหรับคลิกเปิด Sidebar Assistant ของคนไข้รายนั้นได้ทันที
+### การทำงานของแต่ละส่วน:
+1. **Sidebar Doctor Assistant (Server บริการบน Port 3030):**
+   * รันบนพอร์ตเริ่มต้น **`3030`** (URL: `http://<SERVER_IP>:3030/assistant/`)
+   * **สนับสนุนการตัดสินใจทางคลินิก (CDS):** คำนวณค่า eGFR (CKD-EPI 2021) และ CrCl (Cockcroft-Gault) อัตโนมัติ, แจ้งเตือนการปรับขนาดยาไต (Renal Dose Adjustment) ตามเกณฑ์ HOSxP และ KDIGO, ตรวจจับภาวะวิกฤต (Sepsis / Dengue), ติดตาม Care Gap โรคเรื้อรัง (uACR / LDL / Hct), แสดงประวัติแพ้ยา และรายการยาเดิม
+   * **Zero-Write Guarantee:** อ่านข้อมูลด้วยสิทธิ์ `SELECT` เท่านั้น ไม่มีการเขียนหรือแก้ไขฐานข้อมูล HOSxP ของโรงพยาบาล
+2. **Doctor Assistant Companion (ไอคอนพี่หมอบนหน้าจอเครื่องตรวจ):**
+   * โปรแกรมขนาดเล็กสำหรับเครื่องตรวจแพทย์ มีทางลัดไอคอนพี่หมอบนหน้าจอ Desktop
+   * **ตรวจจับคนไข้อัตโนมัติ (Zero-Touch Scanner):** เมื่อแพทย์เปิดดูคนไข้ใน HOSxP โปรแกรมจะสแกนหาเลข VN/HN และส่งมายังแถบผู้ช่วยแพทย์ทันทีโดยที่แพทย์ไม่ต้องพิมพ์ค้นหาซ้ำ
+   * **คลิกเปิดผู้ช่วยแพทย์:** คลิกที่ไอคอนพี่หมอเพื่อเปิดหรือเรียกแถบ Sidebar Doctor Assistant ให้มาแนบชิดขอบขวาของหน้าจอข้าง HOSxP
+   * **เมนูคลิกขวา:** สลับเปิด/ปิดระบบ หรือกำหนด URL ของเซิร์ฟเวอร์โรงพยาบาลได้ง่ายดาย
 
 ---
 
